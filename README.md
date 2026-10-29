@@ -2,8 +2,20 @@
 
 Flutter (mobile + web) version of the Hanabi solitaire from `../hanabi-console`.
 
+Play it at https://oriolbernal.github.io/hanabi-web/
+
+## Documentation
+
+- [How the AI was trained](docs/rl.md) – reinforcement learning, every
+  experiment, results and training curves (in Catalan).
+- [`rl/README.md`](rl/README.md) – technical notes for the training code.
+
+## Code
+
 - `lib/game/` – pure Dart game logic (port of the Java rules)
 - `lib/ui/` – screens and widgets
+- `lib/sim/` – simulated players, hint strategies, trained policies
+- `rl/` – reinforcement learning training (Python)
 
 ```sh
 flutter run -d chrome      # web

@@ -14,7 +14,9 @@ later discards and the agent learns to do exactly that.
 
 from __future__ import annotations
 
+import json
 import random
+from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
@@ -123,3 +125,31 @@ class PlayerEnv(gym.Env):
         if self.game is None or self.game.is_over:
             return np.ones(PLAYER_ACTIONS, dtype=bool)
         return player_mask(self.game)
+
+
+class PlayerAgent:
+    """Runs an exported player agent (JSON) with numpy, as a simulated player
+    returning the same moves as the rule-based ones in game.PLAYERS."""
+
+    name = "agent"
+
+    def __init__(self, path: str | Path) -> None:
+        data = json.loads(Path(path).read_text())
+        self.layers = [(np.asarray(l["w"]), np.asarray(l["b"])) for l in data["layers"]]
+
+    def action(self, game: Game) -> int:
+        x = encode_player(game).astype(np.float64)
+        for i, (w, b) in enumerate(self.layers):
+            x = w @ x + b
+            if i < len(self.layers) - 1:
+                x = np.tanh(x)
+        x[~player_mask(game)] = -np.inf
+        return int(np.argmax(x))
+
+    def __call__(self, game: Game):
+        a = self.action(game)
+        if a == HINT_ACTION:
+            return ("hint", -1)
+        if a < HAND_SIZE:
+            return ("play", a)
+        return ("discard", a - HAND_SIZE)

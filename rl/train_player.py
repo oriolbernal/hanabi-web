@@ -67,6 +67,7 @@ def main() -> None:
     parser.add_argument("--shaping", type=float, default=1.0)
     parser.add_argument("--hints", default="../assets/models/hint_policy.json")
     parser.add_argument("--net", default="256,256")
+    parser.add_argument("--resume", help="continue training a saved model")
     args = parser.parse_args()
 
     torch.set_num_threads(1)
@@ -80,6 +81,12 @@ def main() -> None:
 
     env = DummyVecEnv([lambda: PlayerEnv(args.hints, args.shaping) for _ in range(args.envs)])
     env.seed(args.seed)
+    callback = EvalCallback(100_000, out, hints)
+    if args.resume:
+        model = MaskablePPO.load(args.resume, env=env, tensorboard_log="runs")
+        model.learn(args.steps, callback=callback, tb_log_name=args.name, reset_num_timesteps=False)
+        return
+
     hidden = [int(n) for n in args.net.split(",")]
     model = MaskablePPO(
         "MlpPolicy",
@@ -94,7 +101,7 @@ def main() -> None:
         seed=args.seed,
         verbose=0,
     )
-    model.learn(args.steps, callback=EvalCallback(100_000, out, hints), tb_log_name=args.name)
+    model.learn(args.steps, callback=callback, tb_log_name=args.name)
 
 
 if __name__ == "__main__":

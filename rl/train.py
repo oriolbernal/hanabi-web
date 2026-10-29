@@ -24,12 +24,12 @@ from hanabi.game import PLAYERS, Game, apply_move, build_deck, dummy_hint
 EVAL_SEEDS = range(1_000_000, 1_000_500)
 
 
-def play(choose_hint, seed: int, players: list[str]) -> tuple[int, int, int]:
+def play(choose_hint, seed: int, players: list) -> tuple[int, int, int]:
     """One full game on a fixed deck with the given hint chooser; the player
     profile rotates with the seed. Returns (score, hints given, hints the
     player could act on at once)."""
     game = Game(build_deck(random.Random(seed)))
-    player = PLAYERS[players[seed % len(players)]]
+    player = players[seed % len(players)]
     given = actionable = 0
     while not game.is_over:
         move = player(game)
@@ -84,7 +84,9 @@ def main() -> None:
     parser.add_argument("--net", default="128,128", help="hidden layer sizes")
     parser.add_argument("--resume", help="continue training a saved model")
     parser.add_argument("--hint-cost", type=float, default=0.0, help="reward penalty per hint")
-    parser.add_argument("--players", choices=[*PLAYERS, "mixed"], default="careful")
+    parser.add_argument(
+        "--players", default="careful", help='a profile, "mixed", or "agent:<json>[:<share>]"'
+    )
     parser.add_argument("--gamma", type=float, default=0.99, help="discount: lower values prefer points sooner")
     args = parser.parse_args()
 
@@ -94,7 +96,13 @@ def main() -> None:
     Path("models").mkdir(exist_ok=True)
     Path(f"{out}.json").write_text(json.dumps({"features": args.features}))
 
-    players = list(PLAYERS) if args.players == "mixed" else [args.players]
+    players = [PLAYERS[args.players]] if args.players in PLAYERS else list(PLAYERS.values())
+    if args.players.startswith("agent:"):
+        from hanabi.player_env import PlayerAgent
+
+        # Evaluate on as many agent games as rule-based ones.
+        agent = PlayerAgent(args.players[len("agent:") :].partition(":")[0])
+        players = [p for q in players for p in (q, agent)]
     baseline = np.mean([play(dummy_hint, s, players)[0] for s in EVAL_SEEDS])
     print(f"dummy on eval games: {baseline:.2f}")
 

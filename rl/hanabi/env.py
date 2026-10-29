@@ -27,6 +27,17 @@ class HintEnv(gym.Env):
     ) -> None:
         self.encode, self.size = ENCODERS[features]
         self.hint_cost = hint_cost
+        # "mixed": every rule-based profile; "agent:<json>[:<share>]" adds the
+        # trained player agent, used in <share> of the games (default 0.5).
+        self.agent = None
+        self.agent_share = 0.0
+        if players.startswith("agent:"):
+            from .player_env import PlayerAgent
+
+            path, _, share = players[len("agent:") :].partition(":")
+            self.agent = PlayerAgent(path)
+            self.agent_share = float(share or 0.5)
+            players = "mixed"
         self.players = list(PLAYERS) if players == "mixed" else [players]
         self.player = PLAYERS[self.players[0]]
         low = 0.0 if features == "v1" else -1.0  # v2 effects are deltas
@@ -40,7 +51,10 @@ class HintEnv(gym.Env):
         if seed is not None:
             self._rng.seed(seed)
         self.game = Game(build_deck(self._rng))
-        self.player = PLAYERS[self._rng.choice(self.players)]
+        if self.agent is not None and self._rng.random() < self.agent_share:
+            self.player = self.agent
+        else:
+            self.player = PLAYERS[self._rng.choice(self.players)]
         self._advance()
         # A game always starts with the player asking for a hint.
         assert not self.game.is_over
