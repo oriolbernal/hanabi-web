@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hanabi/game/card.dart';
 import 'package:hanabi/game/game.dart';
+import 'package:hanabi/sim/rl_strategy.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 import 'package:hanabi/sim/simulation.dart';
 import 'package:hanabi/sim/smart_strategies.dart';
@@ -64,5 +65,30 @@ void main() {
     final dummy = benchmark(const DummyStrategy(), player, games: 500);
     final lookahead = benchmark(const LookaheadStrategy(), player, games: 500);
     expect(lookahead.mean, greaterThan(dummy.mean));
+  });
+
+  test('observation has the size the policy expects', () {
+    expect(encodeObservation(Game()).length, observationSize);
+  });
+
+  test('rl strategy only picks useful hints', () {
+    // A network that always prefers the last action (joker hint).
+    final weights = {
+      'layers': [
+        {
+          'w': [List.filled(observationSize, 0.0)],
+          'b': [1.0],
+        },
+        {
+          'w': [
+            for (var a = 0; a < actionCount; a++) [a.toDouble()],
+          ],
+          'b': List.filled(actionCount, 0.0),
+        },
+      ],
+    };
+    final game = Game();
+    final hint = RlStrategy(weights).choose(game)!;
+    expect(game.usefulHints, contains(hint));
   });
 }

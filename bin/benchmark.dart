@@ -1,14 +1,18 @@
 // Plays many games with each hint strategy and compares their scores.
 //
-//   dart run bin/benchmark.dart [games] [seed]
+//   dart run bin/benchmark.dart [games] [seed] [--fast]
 //
-// Monte Carlo is far slower, so it plays at most [mcGames] games.
+// Monte Carlo is far slower, so it plays at most [mcGames] games; --fast
+// skips it. The rl strategy is included once rl/export.py has run.
 
 // ignore_for_file: avoid_print
 
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:hanabi/game/game.dart';
+import 'package:hanabi/sim/rl_strategy.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 import 'package:hanabi/sim/simulation.dart';
 import 'package:hanabi/sim/smart_strategies.dart';
@@ -16,8 +20,9 @@ import 'package:hanabi/sim/smart_strategies.dart';
 const mcGames = 300;
 
 void main(List<String> args) {
-  final games = args.isNotEmpty ? int.parse(args[0]) : 10000;
-  final seed = args.length > 1 ? int.parse(args[1]) : 0;
+  final numbers = args.where((a) => !a.startsWith('--')).toList();
+  final games = numbers.isNotEmpty ? int.parse(numbers[0]) : 10000;
+  final seed = numbers.length > 1 ? int.parse(numbers[1]) : 0;
   const player = CarefulPlayer();
 
   final strategies = <(HintStrategy, int)>[
@@ -26,6 +31,15 @@ void main(List<String> args) {
     (const LookaheadStrategy(), games),
     (MonteCarloStrategy(random: Random(seed)), min(games, mcGames)),
   ];
+
+  final weights = File('assets/models/hint_policy.json');
+  if (weights.existsSync()) {
+    final policy = RlStrategy(jsonDecode(weights.readAsStringSync()));
+    strategies.add((policy, games));
+  }
+  if (args.contains('--fast')) {
+    strategies.removeWhere((s) => s.$1 is MonteCarloStrategy);
+  }
 
   print('player: ${player.name}, seed: $seed\n');
   print('strategy     games   mean  ±95%    std   wins  burned  time');
