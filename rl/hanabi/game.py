@@ -196,10 +196,12 @@ class Game:
     def max_score(self, lost: tuple[Card, ...] = ()) -> int:
         """Port of Game.maxScore: best reachable score, jokers filling gaps."""
 
+        counts: dict[tuple[int, int], int] = {}
+        for x in (*self.discarded, *lost):
+            counts[(x.number, x.color)] = counts.get((x.number, x.color), 0) + 1
+
         def gone(n: int, c: int) -> bool:
-            count = sum(1 for x in self.discarded if x.number == n and x.color == c)
-            count += sum(1 for x in lost if x.number == n and x.color == c)
-            return count >= copies(n, c)
+            return counts.get((n, c), 0) >= copies(n, c)
 
         used = {card.number for c in PILES for card in self.fireworks.piles[c] if card.is_joker}
         jokers = [n for n in range(1, 6) if n not in used and not gone(n, JOKER)]
@@ -366,13 +368,21 @@ class PlayerView:
     def useless_probability(self, index: int) -> float:
         return self._probability(index, self._is_dead)
 
+    def _loss(self, n: int, c: int) -> int:
+        # Reachable score only depends on the table, so cache it per view.
+        cache = self.__dict__.setdefault("_loss_cache", {})
+        if (n, c) not in cache:
+            if "_base" not in cache:
+                cache["_base"] = self.game.max_score()
+            cache[(n, c)] = cache["_base"] - self.game.max_score((Card(n, c),))
+        return cache[(n, c)]
+
     def expected_discard_loss(self, index: int) -> float:
         w = self.weights(index)
         total = sum(w.values())
         if total == 0:
             return 0.0
-        base = self.game.max_score()
-        loss = sum(v * (base - self.game.max_score((Card(n, c),))) for (n, c), v in w.items())
+        loss = sum(v * self._loss(n, c) for (n, c), v in w.items())
         return loss / total
 
     def _can_play(self, number: int, color: int) -> bool:

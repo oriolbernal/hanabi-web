@@ -127,3 +127,27 @@ and the reachable score.
 
 Most of the jump (from ~16.6 to ~18.6) came from the smarter players; the
 hint models now differ by tenths of a point.
+
+## A player agent
+
+`train_player.py` trains the *player* (play / discard / ask for a hint) with
+MaskablePPO against the app's hint policy (`hanabi/player_env.py`). It only
+sees what a person would: hint information (also negative), the derived
+probabilities, discard losses and the table. An oracle that sees its own
+cards scores 23.9 (51% perfect games), so ~5 points are lost to imperfect
+information.
+
+Shaping with the reachable score must use Phi = 0 once the game is over:
+the first try did not, and the agent learned to lose its lives on purpose to
+dodge later penalties (~8 points instead of ~17).
+
+2,000 fresh test games (`eval_player.py`), same decks for all, H_v3 hints:
+
+| player | mean | ±95% |
+|---|---|---|
+| careful | 16.99 | 0.13 |
+| cautious | 18.50 | 0.12 |
+| balanced | 18.74 | 0.12 |
+| bold | 18.79 | 0.13 |
+| P3: PPO, no shaping | 19.51 | 0.13 |
+| P4: PPO, shaping | **19.60** | 0.13 |
