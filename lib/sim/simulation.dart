@@ -18,6 +18,12 @@ class GameResult {
 /// strategies can be compared on identical games.
 GameResult playGame(HintStrategy strategy, SimulatedPlayer player, int seed) {
   final game = Game(random: Random(seed), strategy: strategy);
+  final turns = playOut(game, player);
+  return GameResult(game.score, game.errors, turns);
+}
+
+/// Lets [player] finish [game]. Returns the number of turns played.
+int playOut(Game game, SimulatedPlayer player) {
   var turns = 0;
   while (!game.isOver) {
     turns++;
@@ -30,7 +36,7 @@ GameResult playGame(HintStrategy strategy, SimulatedPlayer player, int seed) {
         if (game.hint() == null) game.discard(0);
     }
   }
-  return GameResult(game.score, game.errors, turns);
+  return turns;
 }
 
 /// The UI asks the human where to put a 2-5 joker; the simulated player
@@ -59,6 +65,9 @@ class BenchmarkReport {
         results.fold(0.0, (s, r) => s + pow(r.score - m, 2)) / results.length;
     return sqrt(variance);
   }
+
+  /// Half-width of the 95% confidence interval of [mean].
+  double get margin => 1.96 * stdDev / sqrt(results.length);
 
   double _rate(bool Function(GameResult) test) =>
       results.where(test).length / results.length;

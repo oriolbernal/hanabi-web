@@ -57,19 +57,41 @@ class Game {
     Random? random,
     List<GameCard>? deck,
     this.strategy = const DummyStrategy(),
-  }) : _deck = deck ?? buildDeck(random) {
+  }) : _deck = deck ?? buildDeck(random),
+       fireworks = Fireworks() {
     _draw(handSize);
+  }
+
+  /// An independent copy for simulations. With [random], the cards left in
+  /// the deck are reshuffled: whoever simulates cannot know their order.
+  Game.copy(Game other, {Random? random, HintStrategy? strategy})
+    : _deck = [for (final c in other._deck) c.copy()],
+      strategy = strategy ?? other.strategy,
+      fireworks = Fireworks.copy(other.fireworks),
+      hints = other.hints,
+      errors = other.errors {
+    hand.addAll([for (final c in other.hand) c.copy()]);
+    discarded.addAll(other.discarded);
+    if (random != null) _deck.shuffle(random);
   }
 
   final List<GameCard> _deck;
   final HintStrategy strategy;
   final List<GameCard> hand = [];
   final List<GameCard> discarded = [];
-  final Fireworks fireworks = Fireworks();
+  final Fireworks fireworks;
   int hints = maxHints;
   int errors = allowedErrors;
 
   int get deckSize => _deck.length;
+
+  /// Copies of (number, color) not yet discarded: played or still to come.
+  int remaining(int number, CardColor color) {
+    final total = color == CardColor.joker ? 1 : numberDistribution[number - 1];
+    return total -
+        discarded.where((c) => c.number == number && c.color == color).length;
+  }
+
   int get score => fireworks.score;
   bool get isOver =>
       fireworks.victory || (_deck.isEmpty && hand.isEmpty) || errors == 0;
@@ -114,8 +136,14 @@ class Game {
     final best = strategy.choose(this);
     if (best == null) return null;
     hints--;
+    applyHint(best);
+    return best;
+  }
+
+  /// Reveals [hint] on the hand without spending a token.
+  void applyHint(Hint hint) {
     for (final card in hand) {
-      switch (best) {
+      switch (hint) {
         case NumberHint(:final number) when card.number == number:
           card.knownNumber = true;
         case ColorHint(:final color) when card.color == color:
@@ -123,7 +151,6 @@ class Game {
         default:
       }
     }
-    return best;
   }
 
   void _draw(int count) {

@@ -3,6 +3,7 @@ import 'package:hanabi/game/card.dart';
 import 'package:hanabi/game/game.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 import 'package:hanabi/sim/simulation.dart';
+import 'package:hanabi/sim/smart_strategies.dart';
 
 void main() {
   test('same seed plays the same game', () {
@@ -47,5 +48,21 @@ void main() {
     final dummy = benchmark(const DummyStrategy(), player, games: 500);
     final random = benchmark(RandomStrategy(), player, games: 500);
     expect(dummy.mean, greaterThan(random.mean));
+  });
+
+  test('a copied game is independent of the original', () {
+    final game = Game();
+    final copy = Game.copy(game)..applyHint(NumberHint(game.hand.first.number));
+    copy.discard(0);
+    expect(game.hand.first.knownNumber, isFalse);
+    expect(game.discarded, isEmpty);
+    expect(game.hand.length, handSize);
+  });
+
+  test('lookahead beats dummy', () {
+    const player = CarefulPlayer();
+    final dummy = benchmark(const DummyStrategy(), player, games: 500);
+    final lookahead = benchmark(const LookaheadStrategy(), player, games: 500);
+    expect(lookahead.mean, greaterThan(dummy.mean));
   });
 }

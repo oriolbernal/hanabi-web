@@ -6,6 +6,15 @@ import 'card.dart';
 /// is alone there: if a real card later needs that pile, or needs an empty
 /// pile the joker could take as its 1, the joker moves to make room.
 class Fireworks {
+  Fireworks();
+
+  /// Played cards never change, so the copy can share them.
+  Fireworks.copy(Fireworks other) {
+    for (final c in CardColor.piles) {
+      _piles[c]!.addAll(other._piles[c]!);
+    }
+  }
+
   final Map<CardColor, List<GameCard>> _piles = {
     for (final c in CardColor.piles) c: <GameCard>[],
   };

@@ -21,6 +21,10 @@ class GameCard {
   bool knownNumber = false;
   bool knownColor = false;
 
+  GameCard copy() => GameCard(number, color)
+    ..knownNumber = knownNumber
+    ..knownColor = knownColor;
+
   bool get isJoker => color == CardColor.joker;
   bool get isKnown => knownNumber && knownColor;
 
