@@ -70,12 +70,16 @@ def encode_player(game: Game) -> np.ndarray:
     return np.asarray(obs, dtype=np.float32)
 
 
-def player_mask(game: Game) -> np.ndarray:
+def player_mask(game: Game, no_wasted_discards: bool = False) -> np.ndarray:
+    """With no_wasted_discards, discarding is not allowed while every hint
+    token is in hand and a useful hint can be asked (it would win nothing)."""
     mask = np.zeros(PLAYER_ACTIONS, dtype=bool)
     n = len(game.hand)
     mask[:n] = True
     mask[HAND_SIZE : HAND_SIZE + n] = True
     mask[HINT_ACTION] = game.hints > 0 and bool(game.useful_hints())
+    if no_wasted_discards and game.hints == MAX_HINTS and mask[HINT_ACTION]:
+        mask[HAND_SIZE : 2 * HAND_SIZE] = False
     return mask
 
 
@@ -92,8 +96,15 @@ def apply_player_action(game: Game, action: int, hint_policy: HintPolicy) -> Non
 class PlayerEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    def __init__(self, hint_policy: str, shaping: float = 0.0, gamma: float = 0.99) -> None:
+    def __init__(
+        self,
+        hint_policy: str,
+        shaping: float = 0.0,
+        gamma: float = 0.99,
+        no_wasted_discards: bool = False,
+    ) -> None:
         self.hint_policy = HintPolicy(hint_policy)
+        self.no_wasted_discards = no_wasted_discards
         self.shaping = shaping
         self.gamma = gamma
         self.observation_space = gym.spaces.Box(0.0, 1.0, (PLAYER_OBSERVATION_SIZE,), np.float32)
@@ -110,7 +121,7 @@ class PlayerEnv(gym.Env):
 
     def step(self, action: int):
         game = self.game
-        assert player_mask(game)[action], "action mask violated"
+        assert player_mask(game, self.no_wasted_discards)[action], "action mask violated"
         score, reach = game.score, game.max_score()
         apply_player_action(game, int(action), self.hint_policy)
         reward = float(game.score - score)
@@ -124,7 +135,7 @@ class PlayerEnv(gym.Env):
     def action_masks(self) -> np.ndarray:
         if self.game is None or self.game.is_over:
             return np.ones(PLAYER_ACTIONS, dtype=bool)
-        return player_mask(self.game)
+        return player_mask(self.game, self.no_wasted_discards)
 
 
 class PlayerAgent:
@@ -133,7 +144,8 @@ class PlayerAgent:
 
     name = "agent"
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, no_wasted_discards: bool = True) -> None:
+        self.no_wasted_discards = no_wasted_discards
         data = json.loads(Path(path).read_text())
         self.layers = [(np.asarray(l["w"]), np.asarray(l["b"])) for l in data["layers"]]
 
@@ -143,7 +155,7 @@ class PlayerAgent:
             x = w @ x + b
             if i < len(self.layers) - 1:
                 x = np.tanh(x)
-        x[~player_mask(game)] = -np.inf
+        x[~player_mask(game, self.no_wasted_discards)] = -np.inf
         return int(np.argmax(x))
 
     def __call__(self, game: Game):

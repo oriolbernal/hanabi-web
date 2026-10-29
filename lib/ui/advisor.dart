@@ -12,7 +12,12 @@ import 'palette.dart';
 /// The trained player agent, loaded once from the app's assets.
 final Future<PlayerPolicy> loadAdvisor = rootBundle
     .loadString('assets/models/player_policy.json')
-    .then((json) => PlayerPolicy(jsonDecode(json) as Map<String, dynamic>));
+    .then(
+      (json) => PlayerPolicy(
+        jsonDecode(json) as Map<String, dynamic>,
+        noWastedDiscards: true,
+      ),
+    );
 
 /// What the advisor knows and would do, from the player's point of view.
 class Advice {

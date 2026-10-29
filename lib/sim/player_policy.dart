@@ -100,17 +100,29 @@ List<CardOdds> cardOdds(Game game) {
 /// The player agent trained with reinforcement learning (`rl/train_player.py`),
 /// used to suggest moves in the app and as a simulated player.
 class PlayerPolicy extends SimulatedPlayer {
-  PlayerPolicy(Map<String, dynamic> weights, {this.name = 'agent'})
-    : _net = Mlp(weights);
+  PlayerPolicy(
+    Map<String, dynamic> weights, {
+    this.name = 'agent',
+    this.noWastedDiscards = false,
+  }) : _net = Mlp(weights);
 
   final Mlp _net;
 
   @override
   final String name;
 
+  /// Rule on top of the network: with every hint token in hand a discard
+  /// wins nothing back, so ask for a hint instead when one is useful.
+  final bool noWastedDiscards;
+
   @override
   Move decide(Game game) {
     final mask = playerActionMask(game);
+    if (noWastedDiscards && game.hints == maxHints && mask[askAction]) {
+      for (var i = handSize; i < 2 * handSize; i++) {
+        mask[i] = false;
+      }
+    }
     final scores = _net(encodePlayerObservation(game));
     var best = -1;
     for (var a = 0; a < playerActionCount; a++) {

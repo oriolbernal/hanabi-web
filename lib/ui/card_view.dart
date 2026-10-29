@@ -78,14 +78,40 @@ class CardView extends StatelessWidget {
             ),
             if (color == CardColor.joker)
               Positioned(
-                top: width * 0.06,
+                bottom: width * 0.06,
                 left: width * 0.1,
                 child: Text(
                   '★',
                   style: TextStyle(color: fg, fontSize: width * 0.22),
                 ),
               ),
-            if (color == null && card.knownNumber)
+            // What hints ruled out, shown as what is still possible.
+            if (!card.knownNumber && card.notNumbers.isNotEmpty)
+              Positioned(
+                top: width * 0.07,
+                left: 0,
+                right: 0,
+                child: Text(
+                  [
+                    for (var n = 1; n <= 5; n++)
+                      if (!card.notNumbers.contains(n)) '$n',
+                  ].join(' '),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: width * 0.17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            if (color == null && card.notColors.isNotEmpty)
+              Positioned(
+                bottom: width * 0.09,
+                left: 0,
+                right: 0,
+                child: _PossibleColors(card: card, size: width * 0.11),
+              )
+            else if (color == null && card.knownNumber)
               Positioned(
                 bottom: width * 0.06,
                 right: width * 0.1,
@@ -97,6 +123,35 @@ class CardView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dots for the colors a card can still be, after the ruled-out ones.
+class _PossibleColors extends StatelessWidget {
+  const _PossibleColors({required this.card, required this.size});
+
+  final GameCard card;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (final c in CardColor.values)
+          if (!card.notColors.contains(c))
+            Container(
+              width: size,
+              height: size,
+              margin: EdgeInsets.symmetric(horizontal: size * 0.15),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: c == CardColor.joker ? null : cardColor(c),
+                gradient: c == CardColor.joker ? jokerGradient : null,
+              ),
+            ),
+      ],
     );
   }
 }

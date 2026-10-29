@@ -145,7 +145,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  ValueListenableBuilder<Stats>(
+                    valueListenable: Settings.stats,
+                    builder: (context, stats, _) => stats.played == 0
+                        ? const SizedBox.shrink()
+                        : Text(
+                            'Best ${stats.best} · average '
+                            '${stats.average.toStringAsFixed(1)} · last 10 '
+                            '${stats.recent().toStringAsFixed(1)} · '
+                            '${stats.played} games',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: textMuted),
+                          ),
+                  ),
+                  const SizedBox(height: 12),
                   ValueListenableBuilder<bool>(
                     valueListenable: Settings.devMode,
                     builder: (context, dev, _) => SizedBox(

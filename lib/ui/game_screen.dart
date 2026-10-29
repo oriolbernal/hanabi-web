@@ -166,18 +166,40 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  void _checkEnd() {
+  Future<void> _checkEnd() async {
     if (!_game.isOver) return;
     final won = _game.fireworks.victory;
-    showDialog<void>(
+    final record = await Settings.recordGame(_game.score);
+    if (!mounted) return;
+    final stats = Settings.stats.value;
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: surface,
-        title: Text(won ? 'Perfect show! 🎆' : 'The show is over'),
-        content: Text(
-          'Your score is ${_game.score} / 25',
-          style: const TextStyle(fontSize: 18),
+        title: Text(
+          won
+              ? 'Perfect show! 🎆'
+              : record
+              ? 'New record! 🎉'
+              : 'The show is over',
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your score is ${_game.score} / 25',
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Best ${stats.best} · average '
+              '${stats.average.toStringAsFixed(1)} over ${stats.played} '
+              '${stats.played == 1 ? 'game' : 'games'}',
+              style: const TextStyle(color: textMuted),
+            ),
+          ],
         ),
         actions: [
           TextButton(

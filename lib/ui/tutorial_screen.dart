@@ -52,6 +52,23 @@ final _steps = [
     ],
   ),
   _Step(
+    'What hints rule out',
+    'A hint also tells you about the cards it does not touch. After "these '
+        'are your 1s", the others show the numbers they can still be; after '
+        '"these are green", the dots show the colors still possible.',
+    [
+      _card(2, CardColor.red)
+        ..notNumbers.add(1)
+        ..notColors.add(CardColor.green),
+      _card(1, CardColor.green, number: true, color: true),
+      _card(5, CardColor.blue)
+        ..notNumbers.add(1)
+        ..notColors.add(CardColor.green),
+      _card(1, CardColor.yellow, number: true)..notColors.add(CardColor.green),
+      _card(3, CardColor.green, color: true)..notNumbers.add(1),
+    ],
+  ),
+  _Step(
     'Misfires',
     'Playing a card that does not fit costs a life. '
         'Lose $allowedErrors lives and the show is over. '
@@ -61,12 +78,22 @@ final _steps = [
   _Step(
     'Jokers',
     'There are five rainbow jokers, numbered 1 to 5. A joker can go on any '
-        'firework. A joker 1 takes the first free spot and steps aside if a '
-        'real 1 needs it. For higher jokers you choose the firework.',
+        'firework. A joker 1 takes the first free spot, marked "wild", and '
+        'steps aside if a real 1 needs it. For higher jokers you choose the '
+        'firework. Keep them for where they are needed: each joker can '
+        'replace one lost card.',
     [
       for (var n = 1; n <= 3; n++)
         _card(n, CardColor.joker, number: true, color: true),
     ],
+  ),
+  _Step(
+    'Max score',
+    'The flag in the top bar shows the best score still reachable. It drops '
+        'when every copy of a card you needed is gone, so discard carefully: '
+        'losing one 5 costs nothing while the joker 5 can replace it, a '
+        'second one costs a point.',
+    [],
   ),
 ];
 
