@@ -121,28 +121,36 @@ List<double> encodeActionEffects(Game game) {
 /// Hints chosen by a small neural network trained with reinforcement
 /// learning (see `rl/`). [weights] is the JSON written by `rl/export.py`.
 class RlStrategy extends HintStrategy {
-  RlStrategy(Map<String, dynamic> weights, {this.name = 'rl'})
-    : _encode = switch (weights['features'] ?? 'v1') {
-        'v1' => encodeObservation,
-        'v2' => encodeObservationV2,
-        final f => throw ArgumentError('unknown feature set $f'),
-      },
-      _layers = [
-        for (final l in weights['layers'] as List)
-          (
-            [
-              for (final row in l['w'] as List)
-                [for (final v in row as List) (v as num).toDouble()],
-            ],
-            [for (final v in l['b'] as List) (v as num).toDouble()],
-          ),
-      ];
+  RlStrategy(
+    Map<String, dynamic> weights, {
+    this.name = 'rl',
+    this.playFirst = false,
+  }) : _encode = switch (weights['features'] ?? 'v1') {
+         'v1' => encodeObservation,
+         'v2' => encodeObservationV2,
+         final f => throw ArgumentError('unknown feature set $f'),
+       },
+       _layers = [
+         for (final l in weights['layers'] as List)
+           (
+             [
+               for (final row in l['w'] as List)
+                 [for (final v in row as List) (v as num).toDouble()],
+             ],
+             [for (final v in l['b'] as List) (v as num).toDouble()],
+           ),
+       ];
 
   final List<double> Function(Game) _encode;
   final List<(List<List<double>>, List<double>)> _layers;
 
   @override
   final String name;
+
+  /// Rule layer on top of the network: when some hint would let the player
+  /// safely play a card right away, only those hints are considered. People
+  /// expect the obvious hint first, which the simulated player does not.
+  final bool playFirst;
 
   /// Scores for each of the [actionCount] actions; higher is preferred.
   List<double> logits(List<double> input) {
@@ -175,11 +183,27 @@ class RlStrategy extends HintStrategy {
 
   @override
   Hint? choose(Game game) {
-    final allowed = {for (final h in game.usefulHints) hintToAction(h)};
+    var allowed = {for (final h in game.usefulHints) hintToAction(h)};
     if (allowed.isEmpty) return null;
+    if (playFirst) {
+      final playable = allowed.where((a) => _unlocksPlay(game, a)).toSet();
+      if (playable.isNotEmpty) allowed = playable;
+    }
     final scores = logits(_encode(game));
     final best = allowed.reduce((a, b) => scores[b] > scores[a] ? b : a);
     return actionToHint(best);
+  }
+
+  static bool _unlocksPlay(Game game, int action) {
+    int playable(Game g) {
+      final view = PlayerView(g);
+      return [for (var i = 0; i < g.hand.length; i++) view.surelyPlayable(i)]
+          .where((p) => p)
+          .length;
+    }
+
+    return playable(Game.copy(game)..applyHint(actionToHint(action))) >
+        playable(game);
   }
 }
 

@@ -24,5 +24,10 @@ enum HintMode {
 
   static final Future<HintStrategy> _rlStrategy = rootBundle
       .loadString('assets/models/hint_policy.json')
-      .then((json) => RlStrategy(jsonDecode(json) as Map<String, dynamic>));
+      .then(
+        (json) => RlStrategy(
+          jsonDecode(json) as Map<String, dynamic>,
+          playFirst: true,
+        ),
+      );
 }

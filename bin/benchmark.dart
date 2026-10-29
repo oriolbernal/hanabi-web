@@ -47,13 +47,21 @@ void main(List<String> args) {
           : 'rl',
     );
     strategies.add((policy, games));
+    strategies.add((
+      RlStrategy(
+        jsonDecode(file.readAsStringSync()),
+        name: '${policy.name}+rule',
+        playFirst: true,
+      ),
+      games,
+    ));
   }
   if (args.contains('--fast')) {
     strategies.removeWhere((s) => s.$1 is MonteCarloStrategy);
   }
 
   print('player: ${player.name}, seed: $seed\n');
-  print('strategy     games   mean  ±95%    std   wins  burned  time');
+  print('strategy     games   mean  ±95%    std  hints  act.%  time');
   for (final (strategy, n) in strategies) {
     final watch = Stopwatch()..start();
     final r = benchmark(strategy, player, games: n, seed: seed);
@@ -63,8 +71,8 @@ void main(List<String> args) {
       '${r.mean.toStringAsFixed(2).padLeft(6)} '
       '${r.margin.toStringAsFixed(2).padLeft(5)} '
       '${r.stdDev.toStringAsFixed(2).padLeft(6)} '
-      '${_pct(r.winRate).padLeft(6)} '
-      '${_pct(r.burnOutRate).padLeft(7)} '
+      '${r.hintsPerGame.toStringAsFixed(1).padLeft(6)} '
+      '${_pct(r.actionableRate).padLeft(6)} '
       '${(watch.elapsedMilliseconds / 1000).toStringAsFixed(1).padLeft(5)}s',
     );
   }

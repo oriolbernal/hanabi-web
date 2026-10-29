@@ -120,3 +120,13 @@ class PlayerView {
         (card.knownColor && card.isJoker);
   }
 }
+
+/// Cards the player can play or discard without any risk.
+int safeActions(Game game) {
+  final view = PlayerView(game);
+  var count = 0;
+  for (var i = 0; i < game.hand.length; i++) {
+    if (view.surelyPlayable(i) || view.surelyUseless(i)) count++;
+  }
+  return count;
+}

@@ -2,8 +2,8 @@
 
 Each step is one hint. Between hints the careful simulated player keeps
 playing and discarding until it asks for the next hint or the game ends.
-The reward is the points scored in between, so an episode's total reward is
-the final score.
+The reward is the points scored in between, minus `hint_cost` per hint, so
+an episode's total reward is the final score minus the cost of the hints.
 """
 
 from __future__ import annotations
@@ -20,8 +20,9 @@ from .game import Game, apply_move, build_deck, careful_move
 class HintEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    def __init__(self, features: str = "v1") -> None:
+    def __init__(self, features: str = "v1", hint_cost: float = 0.0) -> None:
         self.encode, self.size = ENCODERS[features]
+        self.hint_cost = hint_cost
         low = 0.0 if features == "v1" else -1.0  # v2 effects are deltas
         self.observation_space = gym.spaces.Box(low, 1.0, (self.size,), np.float32)
         self.action_space = gym.spaces.Discrete(ACTION_COUNT)
@@ -46,7 +47,7 @@ class HintEnv(gym.Env):
         game.hints -= 1
         game.apply_hint(hint)
         self._advance()
-        reward = float(game.score - before)
+        reward = float(game.score - before) - self.hint_cost
         done = game.is_over
         obs = np.zeros(self.size, np.float32) if done else self.encode(game)
         return obs, reward, done, False, {"score": game.score} if done else {}

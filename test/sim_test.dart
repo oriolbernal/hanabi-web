@@ -91,4 +91,34 @@ void main() {
     final hint = RlStrategy(weights).choose(game)!;
     expect(game.usefulHints, contains(hint));
   });
+
+  test('playFirst hints a 1 on an empty board when the hand has one', () {
+    // A network that always prefers color hints.
+    final weights = {
+      'features': 'v1',
+      'layers': [
+        {
+          'w': [List.filled(observationSize, 0.0)],
+          'b': [1.0],
+        },
+        {
+          'w': [
+            for (var a = 0; a < actionCount; a++) [a < 5 ? -1.0 : 1.0],
+          ],
+          'b': List.filled(actionCount, 0.0),
+        },
+      ],
+    };
+    final game = Game(
+      deck: [
+        GameCard(2, CardColor.green),
+        GameCard(1, CardColor.green),
+        GameCard(4, CardColor.green),
+        GameCard(3, CardColor.red),
+        GameCard(5, CardColor.blue),
+      ],
+    );
+    expect(RlStrategy(weights).choose(game), isA<ColorHint>());
+    expect(RlStrategy(weights, playFirst: true).choose(game), NumberHint(1));
+  });
 }

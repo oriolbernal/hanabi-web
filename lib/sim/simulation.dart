@@ -5,10 +5,11 @@ import '../game/game.dart';
 import 'simulated_player.dart';
 
 class GameResult {
-  GameResult(this.score, this.errorsLeft, this.turns);
+  GameResult(this.score, this.errorsLeft, this.turns, this.hints);
   final int score;
   final int errorsLeft;
   final int turns;
+  final HintStats hints;
 
   bool get won => score == 25;
   bool get burnedOut => errorsLeft == 0;
@@ -18,12 +19,22 @@ class GameResult {
 /// strategies can be compared on identical games.
 GameResult playGame(HintStrategy strategy, SimulatedPlayer player, int seed) {
   final game = Game(random: Random(seed), strategy: strategy);
-  final turns = playOut(game, player);
-  return GameResult(game.score, game.errors, turns);
+  final hints = HintStats();
+  final turns = playOut(game, player, stats: hints);
+  return GameResult(game.score, game.errors, turns, hints);
+}
+
+/// How useful the hints of one game were, as a person would judge them.
+class HintStats {
+  int given = 0;
+
+  /// Hints after which the player could safely play or discard a card it
+  /// could not before.
+  int actionable = 0;
 }
 
 /// Lets [player] finish [game]. Returns the number of turns played.
-int playOut(Game game, SimulatedPlayer player) {
+int playOut(Game game, SimulatedPlayer player, {HintStats? stats}) {
   var turns = 0;
   while (!game.isOver) {
     turns++;
@@ -33,7 +44,13 @@ int playOut(Game game, SimulatedPlayer player) {
       case DiscardMove(:final index):
         game.discard(index);
       case HintMove():
-        if (game.hint() == null) game.discard(0);
+        final before = stats == null ? 0 : safeActions(game);
+        if (game.hint() == null) {
+          game.discard(0);
+        } else if (stats != null) {
+          stats.given++;
+          if (safeActions(game) > before) stats.actionable++;
+        }
     }
   }
   return turns;
@@ -71,6 +88,14 @@ class BenchmarkReport {
 
   double _rate(bool Function(GameResult) test) =>
       results.where(test).length / results.length;
+
+  double get hintsPerGame =>
+      results.fold(0, (s, r) => s + r.hints.given) / results.length;
+
+  /// Share of all hints that let the player act right away.
+  double get actionableRate =>
+      results.fold(0, (s, r) => s + r.hints.actionable) /
+      results.fold(0, (s, r) => s + r.hints.given);
 
   double get winRate => _rate((r) => r.won);
   double get burnOutRate => _rate((r) => r.burnedOut);

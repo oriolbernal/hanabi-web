@@ -50,8 +50,29 @@ change the Python side too and rerun the parity test before training.
 | lookahead (hand-tuned) | – | – | – | 15.55 |
 | first PPO run | v1 | 128×128 | 2M | 15.13 |
 | A: same, trained longer | v1 | 128×128 | 6M | 15.80 |
-| **B: + effect of each hint** | **v2** | **128×128** | **4M** | **16.56** ← in the app |
+| B: + effect of each hint | v2 | 128×128 | 4M | 16.56 |
 | C: bigger network | v2 | 256×256 | 4M | 16.56 |
+| **B + rule: obvious playable hint first** | v2 | 128×128 | 4M | **16.62** ← in the app |
 
 Telling the network what each hint would do (v2) helped far more than
 training longer or a bigger network.
+
+### Hints a person would find silly
+
+Playing it, B often skipped the obvious hint: with a 1 in the opening hand
+it hinted "1" first only 43% of the time (lookahead: 100%). For the score it
+does not matter, because asking for a hint costs the simulated player
+nothing, so the order of hints is irrelevant to the reward.
+
+Reward shaping did not fix it (1M steps, % of hints the player can act on
+at once, B = 43.4%):
+
+| run | change | eval | actionable |
+|---|---|---|---|
+| D | −0.2 reward per hint | 16.46 | 42.6% |
+| E | gamma 0.9 | 16.50 | 43.1% |
+| F | both | 16.62 | 43.6% |
+
+What worked is a rule layer in `RlStrategy(playFirst: true)`: if some hint
+lets the player play a card safely right now, only those are allowed and
+the network picks among them. Score 16.62, first hint "1": 100%.

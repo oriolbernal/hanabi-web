@@ -78,7 +78,7 @@ ACTION_FEATURES = 5
 OBSERVATION_SIZE_V2 = OBSERVATION_SIZE + ACTION_COUNT * ACTION_FEATURES
 
 
-def _sure_counts(game: Game) -> tuple[int, int]:
+def sure_counts(game: Game) -> tuple[int, int]:
     view = PlayerView(game)
     playable = sum(view.surely_playable(i) for i in range(len(game.hand)))
     useless = sum(view.surely_useless(i) for i in range(len(game.hand)))
@@ -88,7 +88,7 @@ def _sure_counts(game: Game) -> tuple[int, int]:
 def encode_action_effects(game: Game) -> list[float]:
     """Per action: change in surely playable cards, change in surely useless
     cards, cards touched, touched cards really playable, touched critical."""
-    playable0, useless0 = _sure_counts(game)
+    playable0, useless0 = sure_counts(game)
     really_playable = game.fireworks.playable_cards()
     useful = {hint_to_action(h) for h in game.useful_hints()}
     out: list[float] = []
@@ -102,7 +102,7 @@ def encode_action_effects(game: Game) -> list[float]:
         ]
         saved = [(c.known_number, c.known_color) for c in game.hand]
         game.apply_hint((kind, value))
-        playable, useless = _sure_counts(game)
+        playable, useless = sure_counts(game)
         for c, (kn, kc) in zip(game.hand, saved):
             c.known_number, c.known_color = kn, kc
         out += [
