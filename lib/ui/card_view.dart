@@ -99,15 +99,23 @@ class CardView extends StatelessWidget {
 
 /// A small, fully revealed card used for discards.
 class MiniCard extends StatelessWidget {
-  const MiniCard({super.key, required this.card, this.size = 26});
+  const MiniCard({
+    super.key,
+    required this.card,
+    this.size = 26,
+    this.highlighted = false,
+  });
 
   final GameCard card;
   final double size;
 
+  /// Draws a thin frame around the card, leaving a small gap.
+  final bool highlighted;
+
   @override
   Widget build(BuildContext context) {
     final isJoker = card.isJoker;
-    return Container(
+    final face = Container(
       width: size,
       height: size * 1.3,
       alignment: Alignment.center,
@@ -124,6 +132,19 @@ class MiniCard extends StatelessWidget {
           color: onCardColor(card.color),
         ),
       ),
+    );
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: highlighted
+              ? accent.withValues(alpha: 0.85)
+              : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      child: face,
     );
   }
 }

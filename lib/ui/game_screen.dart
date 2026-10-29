@@ -459,15 +459,15 @@ class _Discards extends StatelessWidget {
           for (final color in CardColor.values)
             if (cards.any((c) => c.color == color))
               Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 2),
                 child: Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
+                  spacing: 0,
+                  runSpacing: 0,
                   children: [
                     for (final c
                         in cards.where((c) => c.color == color).toList()
                           ..sort((a, b) => a.number.compareTo(b.number)))
-                      MiniCard(card: c),
+                      MiniCard(card: c, highlighted: identical(c, cards.last)),
                   ],
                 ),
               ),
