@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'ui/home_screen.dart';
 import 'ui/palette.dart';
+import 'ui/settings.dart';
 
-void main() => runApp(const HanabiApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Settings.load();
+  runApp(const HanabiApp());
+}
 
 class HanabiApp extends StatelessWidget {
   const HanabiApp({super.key});

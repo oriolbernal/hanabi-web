@@ -4,6 +4,7 @@ import '../game/card.dart';
 import 'game_screen.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
+import 'settings.dart';
 import 'tutorial_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -141,6 +142,27 @@ class _HomeScreenState extends State<HomeScreen> {
                           'How to play',
                           style: TextStyle(fontSize: 18),
                         ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: Settings.devMode,
+                    builder: (context, dev, _) => SizedBox(
+                      width: 240,
+                      child: SwitchListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Dev mode',
+                          style: TextStyle(color: textMuted),
+                        ),
+                        subtitle: const Text(
+                          'AI advisor and odds in game',
+                          style: TextStyle(color: textMuted, fontSize: 12),
+                        ),
+                        value: dev,
+                        onChanged: Settings.setDevMode,
                       ),
                     ),
                   ),

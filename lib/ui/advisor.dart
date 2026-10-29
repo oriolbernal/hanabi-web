@@ -28,6 +28,13 @@ class Advice {
     HintMove() => null,
   };
 
+  /// Green to play, red to discard, blue to ask for a hint.
+  Color get color => switch (move) {
+    PlayMove() => cardColor(CardColor.green),
+    DiscardMove() => cardColor(CardColor.red),
+    HintMove() => hintColor,
+  };
+
   String describe() => switch (move) {
     PlayMove(:final index) =>
       'Play card ${index + 1} · ${_pct(odds[index].play)} it fits',
@@ -53,15 +60,29 @@ Color lossColor(double loss) => loss >= 0.5
 
 /// Odds shown under a card in hand.
 class OddsLabel extends StatelessWidget {
-  const OddsLabel({super.key, required this.odds, required this.width});
+  const OddsLabel({
+    super.key,
+    required this.odds,
+    required this.width,
+    this.suggested,
+  });
 
   final CardOdds odds;
   final double width;
 
+  /// Set to the advice color when this is the card the advisor would use.
+  final Color? suggested;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       width: width,
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: suggested?.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(6),
+        border: suggested == null ? null : Border.all(color: suggested!),
+      ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Column(

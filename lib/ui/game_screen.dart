@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../game/card.dart';
 import '../game/game.dart';
 import '../sim/player_policy.dart';
-import '../sim/simulated_player.dart';
 import 'advisor.dart';
 import 'card_view.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
+import 'settings.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.mode, required this.strategy});
@@ -23,9 +23,28 @@ class _GameScreenState extends State<GameScreen> {
   late Game _game = Game(strategy: widget.strategy);
   int? _selected;
 
-  /// Suggests moves and shows each card's odds; null until loaded.
+  /// Suggests moves and shows each card's odds (dev mode); null until loaded.
   PlayerPolicy? _advisor;
   bool _showAdvice = true;
+
+  /// Moves made so far, so the advice is computed once per move and not on
+  /// every rebuild (it is costly on the web).
+  int _moves = 0;
+  Advice? _advice;
+  int _adviceMoves = -1;
+
+  Advice? _currentAdvice() {
+    final advisor = _advisor;
+    if (!Settings.devMode.value || !_showAdvice || advisor == null) {
+      return null;
+    }
+    if (_game.isOver) return null;
+    if (_adviceMoves != _moves) {
+      _advice = Advice(_game, advisor);
+      _adviceMoves = _moves;
+    }
+    return _advice;
+  }
 
   @override
   void initState() {
@@ -42,6 +61,7 @@ class _GameScreenState extends State<GameScreen> {
     _game = Game(strategy: widget.strategy);
     _selected = null;
     _revealed = {};
+    _moves++;
   });
 
   /// Feedback about the last move, shown above the hand.
@@ -65,6 +85,7 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       _selected = null;
       _revealed = {};
+      _moves++;
     });
     if (result case PlayFailure(:final card)) {
       _toast(
@@ -82,6 +103,7 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       _selected = null;
       _revealed = {};
+      _moves++;
     });
     _toast('Discarded a ${card.number} ${colorName(card.color)}.');
     _checkEnd();
@@ -94,6 +116,7 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     setState(() {
+      _moves++;
       _revealed = switch (hint) {
         NumberHint(:final number) =>
           _game.hand.where((c) => c.number == number).toSet(),
@@ -194,16 +217,17 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: _showAdvice ? 'Hide advice' : 'Show advice',
-            icon: Icon(
-              _showAdvice
-                  ? Icons.tips_and_updates
-                  : Icons.tips_and_updates_outlined,
+          if (Settings.devMode.value)
+            IconButton(
+              tooltip: _showAdvice ? 'Hide advice' : 'Show advice',
+              icon: Icon(
+                _showAdvice
+                    ? Icons.tips_and_updates
+                    : Icons.tips_and_updates_outlined,
+              ),
+              color: _showAdvice ? accent : null,
+              onPressed: () => setState(() => _showAdvice = !_showAdvice),
             ),
-            color: _showAdvice ? accent : null,
-            onPressed: () => setState(() => _showAdvice = !_showAdvice),
-          ),
           IconButton(
             tooltip: 'New game',
             icon: const Icon(Icons.refresh),
@@ -219,10 +243,7 @@ class _GameScreenState extends State<GameScreen> {
               builder: (context, constraints) {
                 final cardWidth = ((constraints.maxWidth - 32 - 4 * 10) / 5)
                     .clamp(40.0, 84.0);
-                final advisor = _advisor;
-                final advice = _showAdvice && advisor != null && !_game.isOver
-                    ? Advice(_game, advisor)
-                    : null;
+                final advice = _currentAdvice();
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -238,6 +259,7 @@ class _GameScreenState extends State<GameScreen> {
                               color: c,
                               top: _game.fireworks.top(c),
                               width: cardWidth,
+                              wild: _game.fireworks.floatingJoker == c,
                             ),
                         ],
                       ),
@@ -266,9 +288,12 @@ class _GameScreenState extends State<GameScreen> {
                                         card: _game.hand[i],
                                         width: cardWidth,
                                         selected: _selected == i,
-                                        highlighted:
-                                            _revealed.contains(_game.hand[i]) ||
-                                            advice?.cardIndex == i,
+                                        highlighted: _revealed.contains(
+                                          _game.hand[i],
+                                        ),
+                                        outline: advice?.cardIndex == i
+                                            ? advice!.color
+                                            : null,
                                         onTap: () => setState(
                                           () => _selected = _selected == i
                                               ? null
@@ -280,6 +305,9 @@ class _GameScreenState extends State<GameScreen> {
                                         OddsLabel(
                                           odds: advice.odds[i],
                                           width: cardWidth,
+                                          suggested: advice.cardIndex == i
+                                              ? advice.color
+                                              : null,
                                         ),
                                       ],
                                     ],
@@ -397,11 +425,7 @@ class _GameScreenState extends State<GameScreen> {
 
   /// The advisor's move; tapping it selects the card it is about.
   Widget _suggestion(Advice advice) {
-    final color = switch (advice.move) {
-      PlayMove() => cardColor(CardColor.green),
-      DiscardMove() => cardColor(CardColor.red),
-      HintMove() => hintColor,
-    };
+    final color = advice.color;
     return GestureDetector(
       onTap: () => setState(() => _selected = advice.cardIndex),
       child: Container(
@@ -516,12 +540,17 @@ class _PileView extends StatelessWidget {
     required this.color,
     required this.top,
     required this.width,
+    this.wild = false,
     this.onTap,
   });
 
   final CardColor color;
   final GameCard? top;
   final double width;
+
+  /// A lone 1-joker: not tied to this color yet, it moves if a real card
+  /// needs the pile.
+  final bool wild;
   final VoidCallback? onTap;
 
   @override
@@ -551,14 +580,31 @@ class _PileView extends StatelessWidget {
         children: [
           body,
           const SizedBox(height: 6),
-          Container(
-            width: width * 0.5,
-            height: 4,
-            decoration: BoxDecoration(
-              color: base,
-              borderRadius: BorderRadius.circular(2),
+          if (wild)
+            SizedBox(
+              height: 4,
+              child: OverflowBox(
+                maxHeight: 14,
+                child: Text(
+                  'wild',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1,
+                    color: textMuted,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              width: width * 0.5,
+              height: 4,
+              decoration: BoxDecoration(
+                color: base,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
         ],
       ),
     );

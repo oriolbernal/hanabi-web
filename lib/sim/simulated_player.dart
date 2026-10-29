@@ -164,6 +164,15 @@ class PlayerView {
   final Game game;
   final Map<int, int> _seen = {};
 
+  /// Reachable-score loss per (number, color); it only depends on the table.
+  final Map<int, int> _losses = {};
+  late final int _base = game.maxScore();
+
+  int _loss(int n, CardColor c) => _losses.putIfAbsent(
+    _key(n, c),
+    () => _base - game.maxScore(lost: [GameCard(n, c)]),
+  );
+
   static int _key(int number, CardColor color) => number * 10 + color.index;
 
   static int _copies(int number, CardColor color) =>
@@ -237,10 +246,9 @@ class PlayerView {
     final w = weights(index);
     final total = w.values.fold(0, (a, b) => a + b);
     if (total == 0) return 0;
-    final base = game.maxScore();
     var loss = 0;
     for (final MapEntry(key: (n, c), :value) in w.entries) {
-      loss += value * (base - game.maxScore(lost: [GameCard(n, c)]));
+      loss += value * _loss(n, c);
     }
     return loss / total;
   }

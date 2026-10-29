@@ -32,9 +32,10 @@ class HintPolicy:
         if not allowed:
             return None
         if self.play_first:
-            playable = [a for a in allowed if _unlocks_play(game, a)]
-            if playable:
-                allowed = playable
+            chance = {a: play_chance_after(game, a) for a in allowed}
+            best = max(chance.values())
+            if best >= 0.5 and best > play_chance_after(game, None) + 1e-9:
+                allowed = [a for a in allowed if chance[a] >= best - 1e-9]
         scores = self.logits(self.encode(game))
         best = allowed[0]
         for a in allowed[1:]:
@@ -43,16 +44,20 @@ class HintPolicy:
         return action_to_hint(best)
 
 
-def _surely_playable_count(game: Game) -> int:
-    view = PlayerView(game)
-    return sum(view.surely_playable(i) for i in range(len(game.hand)))
-
-
-def _unlocks_play(game: Game, action: int) -> bool:
-    before = _surely_playable_count(game)
-    sim = game.copy()
-    sim.apply_hint(action_to_hint(action))
-    return _surely_playable_count(sim) > before
+def play_chance_after(game: Game, action: int | None) -> float:
+    """Port of RlStrategy.playChanceAfter: best chance, for the player, of
+    playing a card that really fits after the hint (or none)."""
+    g = game
+    if action is not None:
+        g = game.copy()
+        g.apply_hint(action_to_hint(action))
+    fits = game.fireworks.playable_cards()
+    view = PlayerView(g)
+    best = 0.0
+    for i, card in enumerate(g.hand):
+        if any(card.same_as(f) for f in fits):
+            best = max(best, view.play_probability(i))
+    return best
 
 
 assert ACTION_COUNT == 11

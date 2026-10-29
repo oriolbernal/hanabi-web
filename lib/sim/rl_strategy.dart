@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../game/card.dart';
 import '../game/game.dart';
 import 'mlp.dart';
@@ -151,9 +153,10 @@ class RlStrategy extends HintStrategy {
   @override
   final String name;
 
-  /// Rule layer on top of the network: when some hint would let the player
-  /// safely play a card right away, only those hints are considered. People
-  /// expect the obvious hint first, which the simulated player does not.
+  /// Rule layer on top of the network: when some hint would give a card
+  /// that really fits a good chance (see [playChanceAfter]) of being played,
+  /// only the hints giving the best chance are considered. People expect
+  /// "it's a 1" (87%) before "it's red" (30%), which the network may not.
   final bool playFirst;
 
   /// Scores for each of the [actionCount] actions; higher is preferred.
@@ -164,24 +167,33 @@ class RlStrategy extends HintStrategy {
     var allowed = {for (final h in game.usefulHints) hintToAction(h)};
     if (allowed.isEmpty) return null;
     if (playFirst) {
-      final playable = allowed.where((a) => _unlocksPlay(game, a)).toSet();
-      if (playable.isNotEmpty) allowed = playable;
+      final chance = {for (final a in allowed) a: playChanceAfter(game, a)};
+      final best = chance.values.reduce(max);
+      if (best >= 0.5 && best > playChanceAfter(game, null) + 1e-9) {
+        allowed = {
+          for (final a in allowed)
+            if (chance[a]! >= best - 1e-9) a,
+        };
+      }
     }
     final scores = logits(_encode(game));
     final best = allowed.reduce((a, b) => scores[b] > scores[a] ? b : a);
     return actionToHint(best);
   }
 
-  static bool _unlocksPlay(Game game, int action) {
-    int playable(Game g) {
-      final view = PlayerView(g);
-      return [for (var i = 0; i < g.hand.length; i++) view.surelyPlayable(i)]
-          .where((p) => p)
-          .length;
+  /// Best chance, from the player's point of view, of playing a card that
+  /// really fits, after giving the hint [action] (or none).
+  static double playChanceAfter(Game game, int? action) {
+    final g = action == null
+        ? game
+        : (Game.copy(game)..applyHint(actionToHint(action)));
+    final fits = game.fireworks.playableCards();
+    final view = PlayerView(g);
+    var best = 0.0;
+    for (var i = 0; i < g.hand.length; i++) {
+      if (fits.any(g.hand[i].sameAs)) best = max(best, view.playProbability(i));
     }
-
-    return playable(Game.copy(game)..applyHint(actionToHint(action))) >
-        playable(game);
+    return best;
   }
 }
 

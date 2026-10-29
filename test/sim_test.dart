@@ -209,4 +209,35 @@ void main() {
       expect(game.maxScore(), 23); // green stops at 3
     },
   );
+
+  test('playFirst prefers "it is a 1" (likely playable) over "it is red"', () {
+    // A network that always prefers color hints.
+    final weights = {
+      'features': 'v1',
+      'layers': [
+        {
+          'w': [List.filled(observationSize, 0.0)],
+          'b': [1.0],
+        },
+        {
+          'w': [
+            for (var a = 0; a < actionCount; a++) [a < 5 ? -1.0 : 1.0],
+          ],
+          'b': List.filled(actionCount, 0.0),
+        },
+      ],
+    };
+    final game = Game(
+      deck: [
+        GameCard(1, CardColor.green),
+        GameCard(1, CardColor.red),
+        GameCard(4, CardColor.blue),
+        GameCard(3, CardColor.white),
+        GameCard(5, CardColor.yellow),
+        GameCard(2, CardColor.yellow),
+      ],
+    );
+    game.play(0); // green 1 is on the table: a 1 is no longer surely playable
+    expect(RlStrategy(weights, playFirst: true).choose(game), NumberHint(1));
+  });
 }

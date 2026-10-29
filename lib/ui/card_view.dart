@@ -11,6 +11,7 @@ class CardView extends StatelessWidget {
     this.width = 64,
     this.selected = false,
     this.highlighted = false,
+    this.outline,
     this.onTap,
   });
 
@@ -18,6 +19,9 @@ class CardView extends StatelessWidget {
   final double width;
   final bool selected;
   final bool highlighted;
+
+  /// A colored border, e.g. for the advisor's suggestion.
+  final Color? outline;
   final VoidCallback? onTap;
 
   @override
@@ -38,8 +42,8 @@ class CardView extends StatelessWidget {
             ? accent
             : highlighted
             ? Colors.white
-            : Colors.white.withValues(alpha: 0.08),
-        width: selected || highlighted ? 3 : 1,
+            : outline ?? Colors.white.withValues(alpha: 0.08),
+        width: selected || highlighted || outline != null ? 3 : 1,
       ),
       boxShadow: [
         if (highlighted)
