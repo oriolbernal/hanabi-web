@@ -11,3 +11,13 @@ flutter run                # connected phone / simulator
 flutter test               # game logic tests
 flutter build web          # output in build/web
 ```
+
+## Benchmarking hint strategies
+
+The hint given when you press *Hint* comes from a `HintStrategy`
+(`lib/game/hint_strategy.dart`). To compare strategies, a simulated player
+(`lib/sim/simulated_player.dart`) plays thousands of games on the same decks:
+
+```sh
+dart run bin/benchmark.dart 10000      # games per strategy
+```

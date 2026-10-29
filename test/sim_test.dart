@@ -1,0 +1,51 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hanabi/game/card.dart';
+import 'package:hanabi/game/game.dart';
+import 'package:hanabi/sim/simulated_player.dart';
+import 'package:hanabi/sim/simulation.dart';
+
+void main() {
+  test('same seed plays the same game', () {
+    final a = playGame(const DummyStrategy(), const CarefulPlayer(), 42);
+    final b = playGame(const DummyStrategy(), const CarefulPlayer(), 42);
+    expect((a.score, a.turns), (b.score, b.turns));
+  });
+
+  test('careful player only plays cards it is sure about', () {
+    final r = benchmark(
+      const DummyStrategy(),
+      const CarefulPlayer(),
+      games: 200,
+    );
+    expect(r.burnOutRate, 0);
+    expect(r.results.every((g) => g.errorsLeft == allowedErrors), isTrue);
+  });
+
+  test('a known 1 is playable on an empty board', () {
+    final game = Game(
+      deck: [for (var i = 0; i < 5; i++) GameCard(1, CardColor.red)],
+    );
+    game.hand.first.knownNumber = true;
+    final move = const CarefulPlayer().decide(game);
+    expect(move, isA<PlayMove>());
+  });
+
+  test('a card whose pile is complete is useless', () {
+    final game = Game(
+      deck: [
+        GameCard(1, CardColor.red),
+        for (var i = 0; i < 4; i++) GameCard(4, CardColor.blue),
+      ],
+    );
+    game.fireworks.play(GameCard(1, CardColor.red));
+    game.hand.first.reveal();
+    expect(PlayerView(game).surelyUseless(0), isTrue);
+  });
+
+  test('dummy beats random', () {
+    const player = CarefulPlayer();
+    final dummy = benchmark(const DummyStrategy(), player, games: 500);
+    final random = benchmark(RandomStrategy(), player, games: 500);
+    expect(dummy.mean, greaterThan(random.mean));
+  });
+}

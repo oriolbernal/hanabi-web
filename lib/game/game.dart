@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'card.dart';
 import 'fireworks.dart';
+import 'hint_strategy.dart';
+
+export 'hint_strategy.dart';
 
 const maxHints = 10;
 const allowedErrors = 3;
@@ -50,12 +53,16 @@ class PlayFailure extends PlayResult {
 }
 
 class Game {
-  Game({Random? random, List<GameCard>? deck})
-    : _deck = deck ?? buildDeck(random) {
+  Game({
+    Random? random,
+    List<GameCard>? deck,
+    this.strategy = const DummyStrategy(),
+  }) : _deck = deck ?? buildDeck(random) {
     _draw(handSize);
   }
 
   final List<GameCard> _deck;
+  final HintStrategy strategy;
   final List<GameCard> hand = [];
   final List<GameCard> discarded = [];
   final Fireworks fireworks = Fireworks();
@@ -90,11 +97,21 @@ class Game {
     return card;
   }
 
-  /// Gives the most useful hint and applies it. Returns null when there are
-  /// no hint tokens left or nothing left to reveal.
+  /// Hints that would reveal something new about the hand.
+  List<Hint> get usefulHints {
+    final result = <Hint>{};
+    for (final card in hand) {
+      if (!card.knownNumber) result.add(NumberHint(card.number));
+      if (!card.knownColor) result.add(ColorHint(card.color));
+    }
+    return result.toList();
+  }
+
+  /// Asks the [strategy] for a hint and applies it. Returns null when there
+  /// are no hint tokens left or nothing left to reveal.
   Hint? hint() {
     if (hints == 0) return null;
-    final best = _bestHint();
+    final best = strategy.choose(this);
     if (best == null) return null;
     hints--;
     for (final card in hand) {
@@ -107,28 +124,6 @@ class Game {
       }
     }
     return best;
-  }
-
-  /// Scores each unrevealed attribute by how many cards share it, with a
-  /// bonus for cards that are playable right now.
-  Hint? _bestHint() {
-    final playable = fireworks.playableCards();
-    final scores = <Hint, int>{};
-    void bump(Hint h) => scores[h] = (scores[h] ?? 0) + 1;
-
-    for (final card in hand) {
-      final isPlayable = playable.any(card.sameAs);
-      if (!card.knownNumber) {
-        bump(NumberHint(card.number));
-        if (isPlayable) bump(NumberHint(card.number));
-      }
-      if (!card.knownColor) {
-        bump(ColorHint(card.color));
-        if (isPlayable) bump(ColorHint(card.color));
-      }
-    }
-    if (scores.isEmpty) return null;
-    return scores.entries.reduce((a, b) => b.value > a.value ? b : a).key;
   }
 
   void _draw(int count) {
