@@ -2,11 +2,66 @@ import 'package:flutter/material.dart';
 
 import '../game/card.dart';
 import 'game_screen.dart';
+import 'hint_mode.dart';
 import 'palette.dart';
 import 'tutorial_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  HintMode _mode = HintMode.ai;
+
+  Future<void> _play() async {
+    final mode = _mode;
+    final strategy = await mode.load();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GameScreen(mode: mode, strategy: strategy),
+      ),
+    );
+  }
+
+  Widget _modeSelector() {
+    return Column(
+      children: [
+        const Text(
+          'HINTS',
+          style: TextStyle(
+            color: textMuted,
+            fontSize: 12,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SegmentedButton<HintMode>(
+          showSelectedIcon: false,
+          segments: [
+            for (final m in HintMode.values)
+              ButtonSegment(value: m, label: Text(m.label)),
+          ],
+          selected: {_mode},
+          onSelectionChanged: (s) => setState(() => _mode = s.first),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 40,
+          child: Text(
+            _mode.description,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: textMuted, fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,14 +112,13 @@ class HomeScreen extends StatelessWidget {
                       letterSpacing: 4,
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 40),
+                  SizedBox(width: 280, child: _modeSelector()),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: 240,
                     child: FilledButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const GameScreen()),
-                      ),
+                      onPressed: _play,
                       child: const Padding(
                         padding: EdgeInsets.all(12),
                         child: Text('Play', style: TextStyle(fontSize: 18)),

@@ -3,24 +3,28 @@ import 'package:flutter/material.dart';
 import '../game/card.dart';
 import '../game/game.dart';
 import 'card_view.dart';
+import 'hint_mode.dart';
 import 'palette.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  const GameScreen({super.key, required this.mode, required this.strategy});
+
+  final HintMode mode;
+  final HintStrategy strategy;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  Game _game = Game();
+  late Game _game = Game(strategy: widget.strategy);
   int? _selected;
 
   /// Cards revealed by the last hint, highlighted until the next move.
   Set<GameCard> _revealed = {};
 
   void _restart() => setState(() {
-    _game = Game();
+    _game = Game(strategy: widget.strategy);
     _selected = null;
     _revealed = {};
   });
@@ -162,9 +166,17 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text(
-          'HANABI',
-          style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.w800),
+        title: Column(
+          children: [
+            const Text(
+              'HANABI',
+              style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '${widget.mode.label} hints',
+              style: const TextStyle(fontSize: 12, color: textMuted),
+            ),
+          ],
         ),
         actions: [
           IconButton(
