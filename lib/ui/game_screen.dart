@@ -263,29 +263,65 @@ class _GameScreenState extends State<GameScreen> {
     return Row(
       children: [
         Expanded(
-          child: FilledButton.icon(
+          child: _actionButton(
+            label: 'Play',
+            icon: Icons.auto_awesome,
+            color: cardColor(CardColor.green),
             onPressed: hasSelection ? _play : null,
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Play'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: FilledButton.tonalIcon(
+          child: _actionButton(
+            label: 'Discard',
+            icon: Icons.delete_outline,
+            color: cardColor(CardColor.red),
             onPressed: hasSelection ? _discard : null,
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Discard'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: OutlinedButton.icon(
+          child: _actionButton(
+            label: 'Hint',
+            icon: Icons.lightbulb_outline,
+            color: hintColor,
             onPressed: _game.hints > 0 ? _hint : null,
-            icon: const Icon(Icons.lightbulb_outline),
-            label: const Text('Hint'),
           ),
         ),
       ],
+    );
+  }
+
+  /// A colored button whose label shrinks instead of wrapping on narrow
+  /// screens.
+  Widget _actionButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+  }) {
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

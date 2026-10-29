@@ -7,6 +7,7 @@ const surface = Color(0xFF161D33);
 const surfaceHigh = Color(0xFF222B48);
 const textMuted = Color(0xFF8A93B2);
 const accent = Color(0xFFFFB547);
+const hintColor = Color(0xFF3E8ED0);
 
 const jokerGradient = LinearGradient(
   begin: Alignment.topLeft,
