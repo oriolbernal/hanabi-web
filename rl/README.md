@@ -151,3 +151,8 @@ dodge later penalties (~8 points instead of ~17).
 | bold | 18.79 | 0.13 |
 | P3: PPO, no shaping | 19.51 | 0.13 |
 | P4: PPO, shaping | **19.60** | 0.13 |
+
+Alternating round (4,000 fresh test games): hints fine-tuned against a mix
+with the agent (HA) and a second player seed (PB) give **20.16** (HA + PB,
+now in the app), against 19.02 for the best rule-based player. Two seeds of
+the same player training ended ~0.6 points apart (P4 vs PB).

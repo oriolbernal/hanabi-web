@@ -14,7 +14,8 @@ TensorBoard (`rl/runs/`) i es regeneren amb `cd rl && uv run python plots.py`.
 | IA de pistes, primer entrenament | 15,1 |
 | IA de pistes, amb "efecte de cada pista" (v2) | 16,6 |
 | ... amb jugadors que arrisquen i valoren els comodins | ~18,6 |
-| **... amb un agent jugador entrenat amb RL** | **19,6** |
+| ... amb un agent jugador entrenat amb RL | 19,6 |
+| **... entrenant pistes i jugador l'un per a l'altre** | **20,2** |
 | Sostre: un jugador que veu les seves cartes | 23,9 |
 
 Les dues primeres xifres i les de la IA de pistes són contra el jugador simulat
@@ -220,7 +221,7 @@ Resultat en **2.000 partides de test noves**, amb les pistes H_v3:
 | balanced | 18,74 | 0,12 |
 | bold | 18,79 | 0,13 |
 | P3: PPO sense *shaping* | 19,51 | 0,13 |
-| **P4: PPO amb *shaping*** (assistent de l'app) | **19,60** | 0,13 |
+| **P4: PPO amb *shaping*** | **19,60** | 0,13 |
 
 **Lliçó:** el *shaping* ben fet no aporta gaire al resultat final (dins del
 marge d'error); mal fet, ensenya l'agent a fer trampes. Només es detecta
@@ -230,17 +231,42 @@ L'agent arrisca molt quan s'acaba el mazo (el 89 % de les partides on perd les
 tres vides): és racional, perquè ja no queden torns per protegir. Per això
 l'assistent mostra sempre la probabilitat de cada jugada.
 
-### 5.7 Més temps i una altra llavor (en curs)
+### 5.7 Entrenament alternat: pistes per a l'agent, més temps i una altra llavor
+
+Tres execucions en paral·lel:
+
+- **HA**: la IA de pistes, partint d'H_v3, afinada contra una barreja on la
+  meitat de les partides les juga l'agent jugador i l'altra meitat els perfils
+  de regles (perquè no deixi de servir a una persona).
+- **PA**: P4 entrenat 5 milions de passos més.
+- **PB**: el mateix entrenament que P4 amb una altra llavor.
 
 ![P4 continuat (PA) i llavor nova (PB)](img/player_seeds.png)
 
-- **PA** continua P4 cinc milions de passos més: s'estabilitza al voltant de
-  19,3-19,5 a les avaluacions de 200 partides. Més temps no l'ajuda clarament.
-- **PB** és el mateix entrenament amb una altra llavor, per saber quant varien
-  els resultats d'un entrenament a un altre.
-- **HA**: la IA de pistes afinada contra una barreja amb l'agent jugador (50 %).
+![IA de pistes afinada amb l'agent (HA)](img/hints_for_agent.png)
 
-Quan acabin, la comparació definitiva es fa amb partides de test noves.
+Resultat en **4.000 partides de test noves** (marge ±0,09-0,12):
+
+| jugador | pistes H_v3 | pistes HA |
+|---|---|---|
+| bold (regles) | 18,97 | 19,02 |
+| P4 | 19,38 | 19,65 |
+| PA (P4 + més temps) | 19,69 | 19,89 |
+| **PB (llavor nova)** | 19,96 | **20,16** ← a l'app |
+
+- **Les pistes noves (HA) ajuden tots els agents** (+0,2-0,3): aprendre a
+  ajudar el jugador bo ha funcionat, sense empitjorar els perfils de regles.
+- **La llavor importa:** PB i P4 són el mateix entrenament i acaben a ~0,6
+  punts de distància. Diferències petites entre dos models poden ser sort de
+  l'entrenament; per això cal comparar diverses llavors.
+- **P4 baixa de 19,60 a 19,38** quan les pistes canvien a la regla de
+  probabilitat: va aprendre amb les pistes antigues. Pistes i jugador s'han
+  d'entrenar l'un per a l'altre.
+- Amb HA + PB, l'agent perd les tres vides en el 21 % de les partides (abans
+  el 41 %).
+- **Maledicció del guanyador:** el "millor" checkpoint escollit amb 200
+  partides d'avaluació (PB: 20,00) queda per sobre del que dona amb partides
+  noves; per això el número que compta és sempre el de test.
 
 ### 5.8 Què passa per dins de PPO
 
@@ -282,9 +308,15 @@ uv run python -u train.py --name H_v3 --features v3 --players mixed --steps 3000
 uv run python export.py models/H_v3.zip ../assets/models/hint_policy.json
 
 # Agent jugador
-uv run python -u train_player.py --name P4 --shaping 1.0 --steps 5000000
-uv run python eval_player.py models/P4.zip --games 2000
-uv run python export.py models/P4.zip ../assets/models/player_policy.json
+uv run python -u train_player.py --name PB --shaping 1.0 --seed 2 --steps 5000000
+uv run python export.py models/PB.zip ../assets/models/player_policy.json
+
+# IA de pistes afinada per a l'agent (la meitat de partides les juga l'agent)
+uv run python -u train.py --name HA --features v3 \
+  --players "agent:../assets/models/player_policy.json:0.5" --resume models/H_v3.zip --steps 3000000
+uv run python export.py models/HA.zip ../assets/models/hint_policy.json
+
+uv run python eval_player.py models/PB.zip --games 4000 --hints ../assets/models/hint_policy.json
 
 uv run tensorboard --logdir runs                # corbes en directe
 uv run python plots.py                          # gràfiques d'aquest document

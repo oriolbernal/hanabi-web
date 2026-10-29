@@ -12,7 +12,7 @@ from hanabi.game import PLAYERS, Card, Game, apply_move, dummy_hint
 from hanabi.player_env import HAND_SIZE, HINT_ACTION, encode_player, player_mask
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "player_parity.json"
-MODEL = Path(__file__).parent.parent / "models" / "P4.zip"
+MODEL = Path(__file__).parent.parent / "models" / "PB.zip"  # the model in assets/
 
 
 @pytest.fixture(scope="module")

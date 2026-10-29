@@ -168,8 +168,18 @@ def player_seeds() -> None:
     reference(ax, 18.86, "jugador bold (18,9)")
     style(ax, "Agent jugador: més temps i una altra llavor", "puntuació mitjana (200 partides)")
     ax.set_ylim(10, 21)
+    ax.set_xlim(0, 11.8)
     ax.legend(loc="lower right", frameon=False, fontsize=9)
     save(fig, "player_seeds.png")
+
+
+def hints_for_agent() -> None:
+    fig, (ax,) = figure("ha")
+    line(ax, *scalars("HA_0"), SERIES[0], "HA (parteix d'H_v3)")
+    style(ax, "IA de pistes afinada amb l'agent jugador", "puntuació mitjana (perfils + agent)")
+    ax.set_xlim(2.9, 6.9)
+    ax.set_ylim(18, 20)
+    save(fig, "hints_for_agent.png")
 
 
 def ppo_internals() -> None:
@@ -191,4 +201,5 @@ if __name__ == "__main__":
     player_features()
     player_agent()
     player_seeds()
+    hints_for_agent()
     ppo_internals()
