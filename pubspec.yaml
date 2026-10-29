@@ -59,6 +59,7 @@ flutter:
 
   assets:
     - assets/models/hint_policy.json
+    - assets/models/player_policy.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:

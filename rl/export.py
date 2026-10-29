@@ -15,14 +15,17 @@ import torch
 from sb3_contrib import MaskablePPO
 
 from hanabi.env import HintEnv
+from hanabi.player_env import PlayerEnv
 
 
 def main() -> None:
     src = sys.argv[1] if len(sys.argv) > 1 else "models/hint_policy.zip"
     dst = Path(sys.argv[2] if len(sys.argv) > 2 else "../assets/models/hint_policy.json")
     policy = MaskablePPO.load(src, device="cpu").policy
-    meta = Path(src).with_suffix(".json")
-    features = json.loads(meta.read_text())["features"] if meta.exists() else "v1"
+    meta_file = Path(src).with_suffix(".json")
+    meta = json.loads(meta_file.read_text()) if meta_file.exists() else {}
+    features = meta.get("features", "v1")
+    agent = meta.get("agent", "hints")
 
     linears = [m for m in policy.mlp_extractor.policy_net if isinstance(m, torch.nn.Linear)]
     linears.append(policy.action_net)
@@ -37,7 +40,7 @@ def main() -> None:
     ]
 
     # Sanity check: a plain numpy forward pass must match PyTorch.
-    env = HintEnv(features)
+    env = PlayerEnv("../assets/models/hint_policy.json") if agent == "player" else HintEnv(features)
     obs, _ = env.reset(seed=1)
     x = obs
     for i, layer in enumerate(layers):
@@ -49,7 +52,7 @@ def main() -> None:
     assert np.allclose(x, ref, atol=1e-4), (x, ref)
 
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"features": features, "layers": layers}))
+    dst.write_text(json.dumps({"agent": agent, "features": features, "layers": layers}))
     sizes = " -> ".join(str(len(l["b"])) for l in layers)
     print(f"Wrote {dst} ({features}: {len(obs)} -> {sizes}, {dst.stat().st_size // 1024} KB)")
 

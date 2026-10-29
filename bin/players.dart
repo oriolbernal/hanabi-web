@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:hanabi/game/game.dart';
+import 'package:hanabi/sim/player_policy.dart';
 import 'package:hanabi/sim/rl_strategy.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 import 'package:hanabi/sim/simulation.dart';
@@ -34,13 +35,19 @@ void main(List<String> args) {
       ),
   ];
 
+  final players = [
+    ...playerProfiles,
+    if (File('assets/models/player_policy.json').existsSync())
+      PlayerPolicy(
+        jsonDecode(File('assets/models/player_policy.json').readAsStringSync()),
+      ),
+  ];
+
   print('$games games each. Cells: mean score (burned out %)\n');
-  print(
-    'strategy    ${[for (final p in playerProfiles) p.name.padLeft(15)].join()}',
-  );
+  print('strategy    ${[for (final p in players) p.name.padLeft(15)].join()}');
   for (final s in strategies) {
     final cells = [
-      for (final p in playerProfiles)
+      for (final p in players)
         () {
           final r = benchmark(s, p, games: games);
           final burned = (r.burnOutRate * 100).toStringAsFixed(0);

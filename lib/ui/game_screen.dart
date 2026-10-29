@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../game/card.dart';
 import '../game/game.dart';
+import '../sim/player_policy.dart';
+import '../sim/simulated_player.dart';
+import 'advisor.dart';
 import 'card_view.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
@@ -19,6 +22,18 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late Game _game = Game(strategy: widget.strategy);
   int? _selected;
+
+  /// Suggests moves and shows each card's odds; null until loaded.
+  PlayerPolicy? _advisor;
+  bool _showAdvice = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadAdvisor.then((a) {
+      if (mounted) setState(() => _advisor = a);
+    });
+  }
 
   /// Cards revealed by the last hint, highlighted until the next move.
   Set<GameCard> _revealed = {};
@@ -180,6 +195,16 @@ class _GameScreenState extends State<GameScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: _showAdvice ? 'Hide advice' : 'Show advice',
+            icon: Icon(
+              _showAdvice
+                  ? Icons.tips_and_updates
+                  : Icons.tips_and_updates_outlined,
+            ),
+            color: _showAdvice ? accent : null,
+            onPressed: () => setState(() => _showAdvice = !_showAdvice),
+          ),
+          IconButton(
             tooltip: 'New game',
             icon: const Icon(Icons.refresh),
             onPressed: _restart,
@@ -194,6 +219,10 @@ class _GameScreenState extends State<GameScreen> {
               builder: (context, constraints) {
                 final cardWidth = ((constraints.maxWidth - 32 - 4 * 10) / 5)
                     .clamp(40.0, 84.0);
+                final advisor = _advisor;
+                final advice = _showAdvice && advisor != null && !_game.isOver
+                    ? Advice(_game, advisor)
+                    : null;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -223,23 +252,37 @@ class _GameScreenState extends State<GameScreen> {
                       _messageBar(),
                       const SizedBox(height: 12),
                       _sectionLabel('YOUR HAND'),
+                      if (advice != null) _suggestion(advice),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (var i = 0; i < handSize; i++)
                             i < _game.hand.length
-                                ? CardView(
-                                    card: _game.hand[i],
-                                    width: cardWidth,
-                                    selected: _selected == i,
-                                    highlighted: _revealed.contains(
-                                      _game.hand[i],
-                                    ),
-                                    onTap: () => setState(
-                                      () =>
-                                          _selected = _selected == i ? null : i,
-                                    ),
+                                ? Column(
+                                    children: [
+                                      CardView(
+                                        card: _game.hand[i],
+                                        width: cardWidth,
+                                        selected: _selected == i,
+                                        highlighted:
+                                            _revealed.contains(_game.hand[i]) ||
+                                            advice?.cardIndex == i,
+                                        onTap: () => setState(
+                                          () => _selected = _selected == i
+                                              ? null
+                                              : i,
+                                        ),
+                                      ),
+                                      if (advice != null) ...[
+                                        const SizedBox(height: 4),
+                                        OddsLabel(
+                                          odds: advice.odds[i],
+                                          width: cardWidth,
+                                        ),
+                                      ],
+                                    ],
                                   )
                                 : SizedBox(width: cardWidth),
                         ],
@@ -347,6 +390,39 @@ class _GameScreenState extends State<GameScreen> {
             color: _message == null ? textMuted : Colors.white,
             fontWeight: FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The advisor's move; tapping it selects the card it is about.
+  Widget _suggestion(Advice advice) {
+    final color = switch (advice.move) {
+      PlayMove() => cardColor(CardColor.green),
+      DiscardMove() => cardColor(CardColor.red),
+      HintMove() => hintColor,
+    };
+    return GestureDetector(
+      onTap: () => setState(() => _selected = advice.cardIndex),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.tips_and_updates, size: 16, color: color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'AI: ${advice.describe()}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
       ),
     );

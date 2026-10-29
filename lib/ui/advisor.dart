@@ -1,0 +1,103 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../game/card.dart';
+import '../game/game.dart';
+import '../sim/player_policy.dart';
+import '../sim/simulated_player.dart';
+import 'palette.dart';
+
+/// The trained player agent, loaded once from the app's assets.
+final Future<PlayerPolicy> loadAdvisor = rootBundle
+    .loadString('assets/models/player_policy.json')
+    .then((json) => PlayerPolicy(jsonDecode(json) as Map<String, dynamic>));
+
+/// What the advisor knows and would do, from the player's point of view.
+class Advice {
+  Advice(Game game, PlayerPolicy agent)
+    : odds = cardOdds(game),
+      move = agent.decide(game);
+
+  final List<CardOdds> odds;
+  final Move move;
+
+  int? get cardIndex => switch (move) {
+    PlayMove(:final index) || DiscardMove(:final index) => index,
+    HintMove() => null,
+  };
+
+  String describe() => switch (move) {
+    PlayMove(:final index) =>
+      'Play card ${index + 1} · ${_pct(odds[index].play)} it fits',
+    DiscardMove(:final index) =>
+      'Discard card ${index + 1} · costs ${odds[index].discardLoss.toStringAsFixed(1)} pts',
+    HintMove() => 'Ask for a hint',
+  };
+}
+
+String _pct(double p) => '${(p * 100).round()}%';
+
+Color playColor(double p) => p >= 0.9
+    ? cardColor(CardColor.green)
+    : p >= 0.6
+    ? accent
+    : textMuted;
+
+Color lossColor(double loss) => loss >= 0.5
+    ? cardColor(CardColor.red)
+    : loss > 0.05
+    ? accent
+    : textMuted;
+
+/// Odds shown under a card in hand.
+class OddsLabel extends StatelessWidget {
+  const OddsLabel({super.key, required this.odds, required this.width});
+
+  final CardOdds odds;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          children: [
+            _line(
+              Icons.play_arrow_rounded,
+              _pct(odds.play),
+              playColor(odds.play),
+            ),
+            _line(
+              Icons.delete_outline,
+              odds.discardLoss < 0.05
+                  ? '0'
+                  : '-${odds.discardLoss.toStringAsFixed(1)}',
+              lossColor(odds.discardLoss),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _line(IconData icon, String text, Color color) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 2),
+      Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    ],
+  );
+}
