@@ -4,3 +4,5 @@ runs/
 models/*.zip
 fixtures/
 train.log
+logs/
+models/*.json

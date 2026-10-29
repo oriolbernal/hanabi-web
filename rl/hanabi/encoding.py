@@ -71,3 +71,52 @@ def encode(game: Game) -> np.ndarray:
 
     obs += [game.hints / MAX_HINTS, game.errors / ALLOWED_ERRORS, len(game.deck) / 50]
     return np.asarray(obs, dtype=np.float32)
+
+
+# Feature set v2 appends, for each action, what giving that hint would do.
+ACTION_FEATURES = 5
+OBSERVATION_SIZE_V2 = OBSERVATION_SIZE + ACTION_COUNT * ACTION_FEATURES
+
+
+def _sure_counts(game: Game) -> tuple[int, int]:
+    view = PlayerView(game)
+    playable = sum(view.surely_playable(i) for i in range(len(game.hand)))
+    useless = sum(view.surely_useless(i) for i in range(len(game.hand)))
+    return playable, useless
+
+
+def encode_action_effects(game: Game) -> list[float]:
+    """Per action: change in surely playable cards, change in surely useless
+    cards, cards touched, touched cards really playable, touched critical."""
+    playable0, useless0 = _sure_counts(game)
+    really_playable = game.fireworks.playable_cards()
+    useful = {hint_to_action(h) for h in game.useful_hints()}
+    out: list[float] = []
+    for a in range(ACTION_COUNT):
+        if a not in useful:
+            out += [0.0] * ACTION_FEATURES
+            continue
+        kind, value = action_to_hint(a)
+        touched = [
+            c for c in game.hand if (c.number if kind == "n" else c.color) == value
+        ]
+        saved = [(c.known_number, c.known_color) for c in game.hand]
+        game.apply_hint((kind, value))
+        playable, useless = _sure_counts(game)
+        for c, (kn, kc) in zip(game.hand, saved):
+            c.known_number, c.known_color = kn, kc
+        out += [
+            (playable - playable0) / 5,
+            (useless - useless0) / 5,
+            len(touched) / 5,
+            sum(any(c.same_as(p) for p in really_playable) for c in touched) / 5,
+            sum(is_critical(game, c) for c in touched) / 5,
+        ]
+    return out
+
+
+def encode_v2(game: Game) -> np.ndarray:
+    return np.concatenate([encode(game), np.asarray(encode_action_effects(game), np.float32)])
+
+
+ENCODERS = {"v1": (encode, OBSERVATION_SIZE), "v2": (encode_v2, OBSERVATION_SIZE_V2)}

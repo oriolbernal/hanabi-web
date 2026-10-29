@@ -1,6 +1,6 @@
 // Plays many games with each hint strategy and compares their scores.
 //
-//   dart run bin/benchmark.dart [games] [seed] [--fast]
+//   dart run bin/benchmark.dart [games] [seed] [--fast] [--model=path ...]
 //
 // Monte Carlo is far slower, so it plays at most [mcGames] games; --fast
 // skips it. The rl strategy is included once rl/export.py has run.
@@ -32,9 +32,20 @@ void main(List<String> args) {
     (MonteCarloStrategy(random: Random(seed)), min(games, mcGames)),
   ];
 
-  final weights = File('assets/models/hint_policy.json');
-  if (weights.existsSync()) {
-    final policy = RlStrategy(jsonDecode(weights.readAsStringSync()));
+  final models = [
+    for (final a in args)
+      if (a.startsWith('--model=')) a.substring('--model='.length),
+  ];
+  if (models.isEmpty) models.add('assets/models/hint_policy.json');
+  for (final path in models) {
+    final file = File(path);
+    if (!file.existsSync()) continue;
+    final policy = RlStrategy(
+      jsonDecode(file.readAsStringSync()),
+      name: models.length > 1
+          ? file.uri.pathSegments.last.split('.').first
+          : 'rl',
+    );
     strategies.add((policy, games));
   }
   if (args.contains('--fast')) {
@@ -47,7 +58,7 @@ void main(List<String> args) {
     final watch = Stopwatch()..start();
     final r = benchmark(strategy, player, games: n, seed: seed);
     print(
-      '${r.strategy.padRight(11)} '
+      '${r.strategy.padRight(11).substring(0, 11)} '
       '${'$n'.padLeft(6)} '
       '${r.mean.toStringAsFixed(2).padLeft(6)} '
       '${r.margin.toStringAsFixed(2).padLeft(5)} '

@@ -14,7 +14,6 @@ import numpy as np
 import torch
 from sb3_contrib import MaskablePPO
 
-from hanabi.encoding import encode
 from hanabi.env import HintEnv
 
 
@@ -22,6 +21,8 @@ def main() -> None:
     src = sys.argv[1] if len(sys.argv) > 1 else "models/hint_policy.zip"
     dst = Path(sys.argv[2] if len(sys.argv) > 2 else "../assets/models/hint_policy.json")
     policy = MaskablePPO.load(src, device="cpu").policy
+    meta = Path(src).with_suffix(".json")
+    features = json.loads(meta.read_text())["features"] if meta.exists() else "v1"
 
     linears = [m for m in policy.mlp_extractor.policy_net if isinstance(m, torch.nn.Linear)]
     linears.append(policy.action_net)
@@ -36,7 +37,7 @@ def main() -> None:
     ]
 
     # Sanity check: a plain numpy forward pass must match PyTorch.
-    env = HintEnv()
+    env = HintEnv(features)
     obs, _ = env.reset(seed=1)
     x = obs
     for i, layer in enumerate(layers):
@@ -48,9 +49,9 @@ def main() -> None:
     assert np.allclose(x, ref, atol=1e-4), (x, ref)
 
     dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(json.dumps({"layers": layers, "observation": len(obs)}))
+    dst.write_text(json.dumps({"features": features, "layers": layers}))
     sizes = " -> ".join(str(len(l["b"])) for l in layers)
-    print(f"Wrote {dst} ({len(obs)} -> {sizes}, {dst.stat().st_size // 1024} KB)")
+    print(f"Wrote {dst} ({features}: {len(obs)} -> {sizes}, {dst.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":

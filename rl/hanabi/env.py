@@ -13,15 +13,17 @@ import random
 import gymnasium as gym
 import numpy as np
 
-from .encoding import ACTION_COUNT, OBSERVATION_SIZE, action_mask, action_to_hint, encode
+from .encoding import ACTION_COUNT, ENCODERS, action_mask, action_to_hint
 from .game import Game, apply_move, build_deck, careful_move
 
 
 class HintEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    def __init__(self) -> None:
-        self.observation_space = gym.spaces.Box(0.0, 1.0, (OBSERVATION_SIZE,), np.float32)
+    def __init__(self, features: str = "v1") -> None:
+        self.encode, self.size = ENCODERS[features]
+        low = 0.0 if features == "v1" else -1.0  # v2 effects are deltas
+        self.observation_space = gym.spaces.Box(low, 1.0, (self.size,), np.float32)
         self.action_space = gym.spaces.Discrete(ACTION_COUNT)
         self.game: Game | None = None
         self._rng = random.Random()
@@ -34,7 +36,7 @@ class HintEnv(gym.Env):
         self._advance()
         # A game always starts with the player asking for a hint.
         assert not self.game.is_over
-        return encode(self.game), {}
+        return self.encode(self.game), {}
 
     def step(self, action: int):
         game = self.game
@@ -46,7 +48,7 @@ class HintEnv(gym.Env):
         self._advance()
         reward = float(game.score - before)
         done = game.is_over
-        obs = np.zeros(OBSERVATION_SIZE, np.float32) if done else encode(game)
+        obs = np.zeros(self.size, np.float32) if done else self.encode(game)
         return obs, reward, done, False, {"score": game.score} if done else {}
 
     def action_masks(self) -> np.ndarray:

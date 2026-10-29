@@ -10,7 +10,7 @@ import '../sim/smart_strategies.dart';
 enum HintMode {
   classic('Classic', 'The original rule: reveals what most cards share.'),
   smart('Smart', 'Tries every hint and picks the one that helps most.'),
-  ai('AI', 'A neural network trained by playing 80,000 games.');
+  ai('AI', 'A neural network trained on thousands of simulated games.');
 
   const HintMode(this.label, this.description);
   final String label;

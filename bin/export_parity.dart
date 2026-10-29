@@ -2,7 +2,7 @@
 //
 //   dart run bin/export_parity.dart [games]
 //
-// For each seed: the dealt deck, and at every hint the observation the
+// For each seed: the dealt deck, and at every hint the (v2) observation the
 // policy would see and the hint the dummy strategy gave, plus final score.
 
 import 'dart:convert';
@@ -24,7 +24,10 @@ class _Recorder extends HintStrategy {
   Hint? choose(Game game) {
     final hint = const DummyStrategy().choose(game);
     if (hint != null) {
-      steps.add({'obs': encodeObservation(game), 'action': hintToAction(hint)});
+      steps.add({
+        'obs': encodeObservationV2(game),
+        'action': hintToAction(hint),
+      });
     }
     return hint;
   }
