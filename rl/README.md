@@ -31,9 +31,10 @@ cd rl
 uv sync
 (cd .. && dart run bin/export_parity.dart)   # reference games
 uv run pytest                                 # Python == Dart?
-uv run python -u train.py --name B_v2 --features v2 --steps 4000000
+uv run python -u train.py --name G_mixed --features v2 --players mixed --steps 3000000
 uv run tensorboard --logdir runs              # learning curves
-uv run python export.py models/B_v2.zip
+uv run python export.py models/G_mixed.zip
+(cd .. && dart run bin/players.dart 3000)        # every strategy × player
 (cd .. && dart run bin/benchmark.dart 10000 --fast)
 ```
 
@@ -52,7 +53,7 @@ change the Python side too and rerun the parity test before training.
 | A: same, trained longer | v1 | 128×128 | 6M | 15.80 |
 | B: + effect of each hint | v2 | 128×128 | 4M | 16.56 |
 | C: bigger network | v2 | 256×256 | 4M | 16.56 |
-| **B + rule: obvious playable hint first** | v2 | 128×128 | 4M | **16.62** ← in the app |
+| B + rule: obvious playable hint first | v2 | 128×128 | 4M | 16.62 |
 
 Telling the network what each hint would do (v2) helped far more than
 training longer or a bigger network.
@@ -76,3 +77,27 @@ at once, B = 43.4%):
 What worked is a rule layer in `RlStrategy(playFirst: true)`: if some hint
 lets the player play a card safely right now, only those are allowed and
 the network picks among them. Score 16.62, first hint "1": 100%.
+
+
+## Players that take risks
+
+`CarefulPlayer` only acts when sure. `RiskTakingPlayer` estimates, from the
+card distribution, discards, played cards and what hints revealed (also
+negatively: "the other two are not green"), how likely each card is to fit
+or to be useless, and plays above a threshold:
+
+| profile | plays at | with one life | discards useless at |
+|---|---|---|---|
+| cautious | 90% | 100% | 100% |
+| balanced | 75% | 95% | 90% |
+| bold | 60% | 85% | 85% |
+
+Lower discard thresholds always lost points (good cards thrown away).
+
+Run G trains against a random profile each game (`--players mixed`).
+Mean score, 3,000 games per cell, both with the playFirst rule:
+
+| model | careful | cautious | balanced | bold |
+|---|---|---|---|---|
+| B (trained vs careful) | **16.69** | 16.13 | 16.66 | 16.93 |
+| **G (mixed players)** ← in the app | 16.58 | **16.60** | **17.18** | **17.42** |

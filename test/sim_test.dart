@@ -121,4 +121,61 @@ void main() {
     expect(RlStrategy(weights).choose(game), isA<ColorHint>());
     expect(RlStrategy(weights, playFirst: true).choose(game), NumberHint(1));
   });
+
+  test('two known 1s: 100% each, then 13/15 after one is played', () {
+    final game = Game(
+      deck: [
+        GameCard(1, CardColor.red),
+        GameCard(1, CardColor.blue),
+        GameCard(4, CardColor.green),
+        GameCard(3, CardColor.white),
+        GameCard(5, CardColor.yellow),
+        GameCard(2, CardColor.green),
+      ],
+    )..applyHint(NumberHint(1));
+    expect(PlayerView(game).playProbability(0), 1);
+    expect(PlayerView(game).playProbability(1), 1);
+
+    game.play(0); // the red 1
+    final other = game.hand.indexWhere((c) => c.number == 1);
+    // Red: 2 copies left; green, blue, yellow, white: 3 each; joker: 1.
+    expect(PlayerView(game).playProbability(other), closeTo(13 / 15, 1e-9));
+  });
+
+  test('a bold player plays risky cards a careful one would not', () {
+    final bold = playerProfiles.last;
+    final careful = benchmark(
+      const DummyStrategy(),
+      const CarefulPlayer(),
+      games: 300,
+    );
+    final risky = benchmark(const DummyStrategy(), bold, games: 300);
+    expect(careful.results.every((r) => r.errorsLeft == allowedErrors), isTrue);
+    expect(risky.results.any((r) => r.errorsLeft < allowedErrors), isTrue);
+  });
+
+  test('a hint rules out that color on the cards it does not touch', () {
+    final game = Game(
+      deck: [
+        GameCard(3, CardColor.red),
+        GameCard(4, CardColor.blue),
+        GameCard(1, CardColor.green),
+        GameCard(2, CardColor.green),
+        GameCard(5, CardColor.green),
+      ],
+    )..applyHint(ColorHint(CardColor.green));
+    expect(game.hand[0].notColors, {CardColor.green});
+    expect(game.hand[1].notColors, {CardColor.green});
+    expect(game.hand[2].knownColor, isTrue);
+    final view = PlayerView(game);
+    expect(view.candidates(0).any((c) => c.$2 == CardColor.green), isFalse);
+  });
+
+  test('ruling out four numbers reveals the fifth', () {
+    final card = GameCard(5, CardColor.red);
+    for (final n in [1, 2, 3, 4]) {
+      card.ruleOutNumber(n);
+    }
+    expect(card.knownNumber, isTrue);
+  });
 }

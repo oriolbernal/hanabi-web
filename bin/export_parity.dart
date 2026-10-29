@@ -4,6 +4,7 @@
 //
 // For each seed: the dealt deck, and at every hint the (v2) observation the
 // policy would see and the hint the dummy strategy gave, plus final score.
+// Seeds rotate through the simulated player profiles.
 
 import 'dart:convert';
 import 'dart:io';
@@ -43,10 +44,12 @@ void main(List<String> args) {
 
 Map<String, Object> _record(int seed) {
   final deck = buildDeck(Random(seed));
+  final player = playerProfiles[seed % playerProfiles.length];
   final recorder = _Recorder();
   final game = Game(deck: [for (final c in deck) c.copy()], strategy: recorder);
-  final turns = playOut(game, const CarefulPlayer());
+  final turns = playOut(game, player);
   return {
+    'player': player.name,
     'deck': [
       for (final c in deck) [c.number, c.color.index],
     ],

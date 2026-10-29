@@ -7,7 +7,7 @@ exported from Dart and checks every decision and final score.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 RED, GREEN, BLUE, YELLOW, WHITE, JOKER = range(6)
 COLORS = 6
@@ -28,6 +28,9 @@ class Card:
     color: int
     known_number: bool = False
     known_color: bool = False
+    # Ruled out by hints that did not touch this card.
+    not_numbers: set[int] = field(default_factory=set)
+    not_colors: set[int] = field(default_factory=set)
 
     @property
     def is_joker(self) -> bool:
@@ -40,8 +43,29 @@ class Card:
     def same_as(self, other: Card) -> bool:
         return self.number == other.number and self.color == other.color
 
+    @property
+    def is_known(self) -> bool:
+        return self.known_number and self.known_color
+
+    def rule_out_number(self, n: int) -> None:
+        self.not_numbers.add(n)
+        if len(self.not_numbers) == 4:
+            self.known_number = True
+
+    def rule_out_color(self, c: int) -> None:
+        self.not_colors.add(c)
+        if len(self.not_colors) == COLORS - 1:
+            self.known_color = True
+
     def copy(self) -> Card:
-        return Card(self.number, self.color, self.known_number, self.known_color)
+        return Card(
+            self.number,
+            self.color,
+            self.known_number,
+            self.known_color,
+            set(self.not_numbers),
+            set(self.not_colors),
+        )
 
 
 def copies(number: int, color: int) -> int:
@@ -197,10 +221,15 @@ class Game:
     def apply_hint(self, hint: Hint) -> None:
         kind, value = hint
         for card in self.hand:
-            if kind == "n" and card.number == value:
-                card.known_number = True
-            elif kind == "c" and card.color == value:
+            if kind == "n":
+                if card.number == value:
+                    card.known_number = True
+                else:
+                    card.rule_out_number(value)
+            elif card.color == value:
                 card.known_color = True
+            else:
+                card.rule_out_color(value)
 
     def _draw(self, count: int) -> None:
         for _ in range(count):
@@ -262,9 +291,42 @@ class PlayerView:
         return [
             (n, c)
             for c in colors
+            if c not in card.not_colors
             for n in numbers
-            if self.seen.get((n, c), 0) < copies(n, c)
+            if n not in card.not_numbers and self.seen.get((n, c), 0) < copies(n, c)
         ]
+
+    def weights(self, index: int) -> dict[tuple[int, int], int]:
+        """Copies of each candidate not yet accounted for (see Dart)."""
+        in_hand: dict[tuple[int, int], int] = {}
+        for j, c in enumerate(self.game.hand):
+            if j != index and c.is_known:
+                key = (c.number, c.color)
+                in_hand[key] = in_hand.get(key, 0) + 1
+        result = {}
+        for n, c in self.candidates(index):
+            w = copies(n, c) - self.seen.get((n, c), 0) - in_hand.get((n, c), 0)
+            if w > 0:
+                result[(n, c)] = w
+        return result
+
+    def _probability(self, index: int, test) -> float:
+        w = self.weights(index)
+        total = sum(w.values())
+        if total == 0:
+            return 0.0
+        return sum(v for (n, c), v in w.items() if test(n, c)) / total
+
+    def play_probability(self, index: int) -> float:
+        return self._probability(index, self._can_play)
+
+    def useless_probability(self, index: int) -> float:
+        return self._probability(index, self._is_dead)
+
+    def critical_probability(self, index: int) -> float:
+        return self._probability(
+            index, lambda n, c: not self._is_dead(n, c) and self.game.remaining(n, c) == 1
+        )
 
     def _can_play(self, number: int, color: int) -> bool:
         f = self.game.fireworks
@@ -312,6 +374,57 @@ def careful_move(game: Game) -> Move:
         if not view.maybe_valuable(i):
             return ("discard", i)
     return ("discard", 0)
+
+
+@dataclass(frozen=True)
+class RiskTakingPlayer:
+    """Port of RiskTakingPlayer in lib/sim/simulated_player.dart."""
+
+    name: str
+    play_threshold: float
+    last_life_threshold: float
+    discard_threshold: float
+
+    def __call__(self, game: Game) -> Move:
+        view = PlayerView(game)
+        n = len(game.hand)
+
+        best, best_p = -1, -1.0
+        for i in range(n):
+            p = view.play_probability(i)
+            if p > best_p:
+                best, best_p = i, p
+        threshold = self.last_life_threshold if game.errors == 1 else self.play_threshold
+        if best >= 0 and best_p >= threshold:
+            return ("play", best)
+
+        junk, junk_p = -1, -1.0
+        for i in range(n):
+            p = view.useless_probability(i)
+            if p > junk_p:
+                junk, junk_p = i, p
+        if junk >= 0 and junk_p >= self.discard_threshold:
+            return ("discard", junk)
+        if game.hints > 0 and game.useful_hints():
+            return ("hint", -1)
+
+        safest, safest_cost = 0, float("inf")
+        for i in range(n):
+            card = game.hand[i]
+            hinted = card.known_number or card.known_color
+            cost = (1 if hinted else 0) + view.critical_probability(i)
+            if cost < safest_cost:
+                safest, safest_cost = i, cost
+        return ("discard", safest)
+
+
+# Same order and settings as playerProfiles in Dart.
+PLAYERS = {
+    "careful": careful_move,
+    "cautious": RiskTakingPlayer("cautious", 0.9, 1.0, 1.0),
+    "balanced": RiskTakingPlayer("balanced", 0.75, 0.95, 0.9),
+    "bold": RiskTakingPlayer("bold", 0.6, 0.85, 0.85),
+}
 
 
 def joker_target(game: Game, index: int) -> int | None:

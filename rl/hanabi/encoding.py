@@ -100,11 +100,11 @@ def encode_action_effects(game: Game) -> list[float]:
         touched = [
             c for c in game.hand if (c.number if kind == "n" else c.color) == value
         ]
-        saved = [(c.known_number, c.known_color) for c in game.hand]
+        saved = game.hand
+        game.hand = [c.copy() for c in saved]
         game.apply_hint((kind, value))
         playable, useless = sure_counts(game)
-        for c, (kn, kc) in zip(game.hand, saved):
-            c.known_number, c.known_color = kn, kc
+        game.hand = saved
         out += [
             (playable - playable0) / 5,
             (useless - useless0) / 5,

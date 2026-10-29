@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from hanabi.encoding import encode_v2, hint_to_action
-from hanabi.game import Card, Game, apply_move, careful_move, dummy_hint
+from hanabi.game import PLAYERS, Card, Game, apply_move, dummy_hint
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "parity.json"
 
@@ -21,12 +21,12 @@ def games():
     return json.loads(FIXTURE.read_text())
 
 
-def replay(deck):
+def replay(deck, player):
     game = Game([Card(n, c) for n, c in deck])
     steps, turns = [], 0
     while not game.is_over:
         turns += 1
-        move = careful_move(game)
+        move = player(game)
         if move[0] == "hint":
             hint = dummy_hint(game)
             if hint is None:
@@ -42,7 +42,7 @@ def replay(deck):
 
 def test_same_games_as_dart(games):
     for seed, expected in enumerate(games):
-        score, turns, steps = replay(expected["deck"])
+        score, turns, steps = replay(expected["deck"], PLAYERS[expected["player"]])
         assert len(steps) == len(expected["steps"]), f"seed {seed}"
         for k, ((obs, action), ref) in enumerate(zip(steps, expected["steps"])):
             assert action == ref["action"], f"seed {seed} step {k}"

@@ -19,18 +19,20 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from hanabi.encoding import ENCODERS, sure_counts, action_mask, action_to_hint
 from hanabi.env import HintEnv
-from hanabi.game import Game, apply_move, build_deck, careful_move, dummy_hint
+from hanabi.game import PLAYERS, Game, apply_move, build_deck, dummy_hint
 
 EVAL_SEEDS = range(1_000_000, 1_000_500)
 
 
-def play(choose_hint, seed: int) -> tuple[int, int, int]:
-    """One full game on a fixed deck with the given hint chooser.
-    Returns (score, hints given, hints the player could act on at once)."""
+def play(choose_hint, seed: int, players: list[str]) -> tuple[int, int, int]:
+    """One full game on a fixed deck with the given hint chooser; the player
+    profile rotates with the seed. Returns (score, hints given, hints the
+    player could act on at once)."""
     game = Game(build_deck(random.Random(seed)))
+    player = PLAYERS[players[seed % len(players)]]
     given = actionable = 0
     while not game.is_over:
-        move = careful_move(game)
+        move = player(game)
         if move[0] == "hint":
             before = sum(sure_counts(game))
             game.hints -= 1
@@ -53,13 +55,14 @@ def policy_chooser(model, encode):
 class EvalCallback(BaseCallback):
     """Every `every` steps, plays the eval games and keeps the best model."""
 
-    def __init__(self, every: int, path: str, encode):
+    def __init__(self, every: int, path: str, encode, players: list[str]):
         super().__init__()
         self.every, self.path, self.encode, self.best = every, path, encode, -1.0
+        self.players = players
 
     def _on_step(self) -> bool:
         if self.num_timesteps % self.every < self.training_env.num_envs:
-            games = [play(policy_chooser(self.model, self.encode), s) for s in EVAL_SEEDS]
+            games = [play(policy_chooser(self.model, self.encode), s, self.players) for s in EVAL_SEEDS]
             score = np.mean([g[0] for g in games])
             act = sum(g[2] for g in games) / sum(g[1] for g in games)
             self.logger.record("eval/mean_score", score)
@@ -81,6 +84,7 @@ def main() -> None:
     parser.add_argument("--net", default="128,128", help="hidden layer sizes")
     parser.add_argument("--resume", help="continue training a saved model")
     parser.add_argument("--hint-cost", type=float, default=0.0, help="reward penalty per hint")
+    parser.add_argument("--players", choices=[*PLAYERS, "mixed"], default="careful")
     parser.add_argument("--gamma", type=float, default=0.99, help="discount: lower values prefer points sooner")
     args = parser.parse_args()
 
@@ -90,16 +94,17 @@ def main() -> None:
     Path("models").mkdir(exist_ok=True)
     Path(f"{out}.json").write_text(json.dumps({"features": args.features}))
 
-    baseline = np.mean([play(dummy_hint, s)[0] for s in EVAL_SEEDS])
+    players = list(PLAYERS) if args.players == "mixed" else [args.players]
+    baseline = np.mean([play(dummy_hint, s, players)[0] for s in EVAL_SEEDS])
     print(f"dummy on eval games: {baseline:.2f}")
 
-    env = DummyVecEnv([lambda: HintEnv(args.features, args.hint_cost) for _ in range(args.envs)])
+    env = DummyVecEnv([lambda: HintEnv(args.features, args.hint_cost, args.players) for _ in range(args.envs)])
     env.seed(args.seed)
     if args.resume:
         model = MaskablePPO.load(args.resume, env=env, tensorboard_log="runs")
         model.learn(
             args.steps,
-            callback=EvalCallback(50_000, out, ENCODERS[args.features][0]),
+            callback=EvalCallback(50_000, out, ENCODERS[args.features][0], players),
             tb_log_name=args.name,
             reset_num_timesteps=False,
         )
@@ -121,7 +126,7 @@ def main() -> None:
     )
     model.learn(
         args.steps,
-        callback=EvalCallback(50_000, out, ENCODERS[args.features][0]),
+        callback=EvalCallback(50_000, out, ENCODERS[args.features][0], players),
         tb_log_name=args.name,
     )
 

@@ -146,9 +146,12 @@ class Game {
       switch (hint) {
         case NumberHint(:final number) when card.number == number:
           card.knownNumber = true;
+        case NumberHint(:final number):
+          card.ruleOutNumber(number);
         case ColorHint(:final color) when card.color == color:
           card.knownColor = true;
-        default:
+        case ColorHint(:final color):
+          card.ruleOutColor(color);
       }
     }
   }
