@@ -119,4 +119,18 @@ def encode_v2(game: Game) -> np.ndarray:
     return np.concatenate([encode(game), np.asarray(encode_action_effects(game), np.float32)])
 
 
-ENCODERS = {"v1": (encode, OBSERVATION_SIZE), "v2": (encode_v2, OBSERVATION_SIZE_V2)}
+OBSERVATION_SIZE_V3 = OBSERVATION_SIZE_V2 + HAND_SIZE + 1
+
+
+def encode_v3(game: Game) -> np.ndarray:
+    """v2 plus discard loss of each card and the reachable score."""
+    extra = [game.discard_loss(game.hand[i]) / 5 if i < len(game.hand) else 0.0 for i in range(HAND_SIZE)]
+    extra.append(game.max_score() / 25)
+    return np.concatenate([encode_v2(game), np.asarray(extra, np.float32)])
+
+
+ENCODERS = {
+    "v1": (encode, OBSERVATION_SIZE),
+    "v2": (encode_v2, OBSERVATION_SIZE_V2),
+    "v3": (encode_v3, OBSERVATION_SIZE_V3),
+}

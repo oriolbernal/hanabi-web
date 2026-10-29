@@ -183,6 +183,49 @@ class Game:
             or self.errors == 0
         )
 
+    def copy(self) -> Game:
+        g = Game.__new__(Game)
+        g.deck = [c.copy() for c in self.deck]
+        g.hand = [c.copy() for c in self.hand]
+        g.discarded = list(self.discarded)
+        g.fireworks = Fireworks()
+        g.fireworks.piles = {c: list(p) for c, p in self.fireworks.piles.items()}
+        g.hints, g.errors = self.hints, self.errors
+        return g
+
+    def max_score(self, lost: tuple[Card, ...] = ()) -> int:
+        """Port of Game.maxScore: best reachable score, jokers filling gaps."""
+
+        def gone(n: int, c: int) -> bool:
+            count = sum(1 for x in self.discarded if x.number == n and x.color == c)
+            count += sum(1 for x in lost if x.number == n and x.color == c)
+            return count >= copies(n, c)
+
+        used = {card.number for c in PILES for card in self.fireworks.piles[c] if card.is_joker}
+        jokers = [n for n in range(1, 6) if n not in used and not gone(n, JOKER)]
+        tops = [self.fireworks.top_number(c) for c in PILES]
+        gaps = [{n for n in range(tops[p] + 1, 6) if gone(n, PILES[p])} for p in range(len(PILES))]
+
+        def heights(g):
+            return sum(5 if not s else min(s) - 1 for s in g)
+
+        def best(j, g):
+            if j == len(jokers):
+                return heights(g)
+            result = best(j + 1, g)
+            for p in range(len(g)):
+                if jokers[j] not in g[p]:
+                    continue
+                filled = list(g)
+                filled[p] = g[p] - {jokers[j]}
+                result = max(result, best(j + 1, filled))
+            return result
+
+        return best(0, gaps)
+
+    def discard_loss(self, card: Card) -> int:
+        return self.max_score() - self.max_score((card,))
+
     def remaining(self, number: int, color: int) -> int:
         gone = sum(1 for c in self.discarded if c.number == number and c.color == color)
         return copies(number, color) - gone
@@ -323,10 +366,14 @@ class PlayerView:
     def useless_probability(self, index: int) -> float:
         return self._probability(index, self._is_dead)
 
-    def critical_probability(self, index: int) -> float:
-        return self._probability(
-            index, lambda n, c: not self._is_dead(n, c) and self.game.remaining(n, c) == 1
-        )
+    def expected_discard_loss(self, index: int) -> float:
+        w = self.weights(index)
+        total = sum(w.values())
+        if total == 0:
+            return 0.0
+        base = self.game.max_score()
+        loss = sum(v * (base - self.game.max_score((Card(n, c),))) for (n, c), v in w.items())
+        return loss / total
 
     def _can_play(self, number: int, color: int) -> bool:
         f = self.game.fireworks
@@ -363,7 +410,7 @@ def careful_move(game: Game) -> Move:
     view = PlayerView(game)
     n = len(game.hand)
     for i in range(n):
-        if view.surely_playable(i):
+        if view.surely_playable(i) and not wastes_joker(game, i):
             return ("play", i)
     for i in range(n):
         if view.surely_useless(i):
@@ -391,7 +438,7 @@ class RiskTakingPlayer:
 
         best, best_p = -1, -1.0
         for i in range(n):
-            p = view.play_probability(i)
+            p = 0.0 if wastes_joker(game, i) else view.play_probability(i)
             if p > best_p:
                 best, best_p = i, p
         threshold = self.last_life_threshold if game.errors == 1 else self.play_threshold
@@ -412,7 +459,7 @@ class RiskTakingPlayer:
         for i in range(n):
             card = game.hand[i]
             hinted = card.known_number or card.known_color
-            cost = (1 if hinted else 0) + view.critical_probability(i)
+            cost = (1 if hinted else 0) + view.expected_discard_loss(i)
             if cost < safest_cost:
                 safest, safest_cost = i, cost
         return ("discard", safest)
@@ -427,14 +474,31 @@ PLAYERS = {
 }
 
 
-def joker_target(game: Game, index: int) -> int | None:
-    if not game.needs_target(index):
-        return None
+def best_joker_target(game: Game, index: int) -> int:
     card = game.hand[index]
+    best, best_max = None, -1
     for c in PILES:
-        if game.fireworks.fits(card, c):
-            return c
-    return RED
+        if not game.fireworks.fits(card, c):
+            continue
+        sim = game.copy()
+        sim.play(index, c)
+        reach = sim.max_score()
+        if reach > best_max:
+            best, best_max = c, reach
+    return RED if best is None else best
+
+
+def joker_target(game: Game, index: int) -> int | None:
+    return best_joker_target(game, index) if game.needs_target(index) else None
+
+
+def wastes_joker(game: Game, index: int) -> bool:
+    card = game.hand[index]
+    if not card.is_known or not card.is_joker or not game.deck:
+        return False
+    sim = game.copy()
+    sim.play(index, joker_target(game, index))
+    return sim.max_score() < game.max_score()
 
 
 def apply_move(game: Game, move: Move) -> None:

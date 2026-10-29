@@ -92,6 +92,63 @@ class Game {
         discarded.where((c) => c.number == number && c.color == color).length;
   }
 
+  /// Highest score still reachable if every card left were played in the
+  /// right order, as if [lost] were discarded too. Each joker not yet used
+  /// can fill the gap left by one lost card of its number, on any pile.
+  int maxScore({List<GameCard> lost = const []}) {
+    bool gone(int n, CardColor c) {
+      final total = c == CardColor.joker ? 1 : numberDistribution[n - 1];
+      bool same(GameCard x) => x.number == n && x.color == c;
+      return discarded.where(same).length + lost.where(same).length >= total;
+    }
+
+    final usedJokers = {
+      for (final c in CardColor.piles)
+        for (final card in fireworks.pile(c))
+          if (card.isJoker) card.number,
+    };
+    final jokers = [
+      for (var n = 1; n <= 5; n++)
+        if (!usedJokers.contains(n) && !gone(n, CardColor.joker)) n,
+    ];
+    final tops = [
+      for (final c in CardColor.piles) fireworks.top(c)?.number ?? 0,
+    ];
+    final gaps = [
+      for (var p = 0; p < tops.length; p++)
+        {
+          for (var n = tops[p] + 1; n <= 5; n++)
+            if (gone(n, CardColor.piles[p])) n,
+        },
+    ];
+
+    int heights(List<Set<int>> g) {
+      var sum = 0;
+      for (var p = 0; p < g.length; p++) {
+        sum += g[p].isEmpty ? 5 : g[p].reduce(min) - 1;
+      }
+      return sum;
+    }
+
+    // Try every way of giving each joker to a pile it would help.
+    int best(int j, List<Set<int>> g) {
+      if (j == jokers.length) return heights(g);
+      var result = best(j + 1, g);
+      for (var p = 0; p < g.length; p++) {
+        if (!g[p].contains(jokers[j])) continue;
+        final filled = [...g];
+        filled[p] = {...g[p]}..remove(jokers[j]);
+        result = max(result, best(j + 1, filled));
+      }
+      return result;
+    }
+
+    return best(0, gaps);
+  }
+
+  /// Points of [maxScore] lost if [card] were thrown away.
+  int discardLoss(GameCard card) => maxScore() - maxScore(lost: [card]);
+
   int get score => fireworks.score;
   bool get isOver =>
       fireworks.victory || (_deck.isEmpty && hand.isEmpty) || errors == 0;

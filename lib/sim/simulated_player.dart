@@ -43,7 +43,7 @@ class CarefulPlayer extends SimulatedPlayer {
   Move decide(Game game) {
     final view = PlayerView(game);
     for (var i = 0; i < game.hand.length; i++) {
-      if (view.surelyPlayable(i)) return PlayMove(i);
+      if (view.surelyPlayable(i) && !wastesJoker(game, i)) return PlayMove(i);
     }
     for (var i = 0; i < game.hand.length; i++) {
       if (view.surelyUseless(i)) return DiscardMove(i);
@@ -63,8 +63,8 @@ class CarefulPlayer extends SimulatedPlayer {
 /// 1. Plays the card most likely to fit, if likely enough.
 /// 2. Discards the card most likely to be useless, if likely enough.
 /// 3. Otherwise asks for a hint while there are tokens left.
-/// 4. Otherwise discards an unhinted card, the least likely to be a last
-///    copy.
+/// 4. Otherwise discards an unhinted card, the one expected to lower the
+///    reachable score the least.
 class RiskTakingPlayer extends SimulatedPlayer {
   const RiskTakingPlayer(
     this.name, {
@@ -87,7 +87,7 @@ class RiskTakingPlayer extends SimulatedPlayer {
     var best = -1;
     var bestP = -1.0;
     for (var i = 0; i < n; i++) {
-      final p = view.playProbability(i);
+      final p = wastesJoker(game, i) ? 0.0 : view.playProbability(i);
       if (p > bestP) {
         best = i;
         bestP = p;
@@ -109,13 +109,13 @@ class RiskTakingPlayer extends SimulatedPlayer {
     if (game.hints > 0 && game.usefulHints.isNotEmpty) return HintMove();
 
     // Hinted cards are being prepared to play: throw away an unhinted one
-    // if possible, the one least likely to be a last copy.
+    // if possible, the one expected to cost the fewest points.
     var safest = 0;
     var safestCost = double.infinity;
     for (var i = 0; i < n; i++) {
       final card = game.hand[i];
       final hinted = card.knownNumber || card.knownColor;
-      final cost = (hinted ? 1 : 0) + view.criticalProbability(i);
+      final cost = (hinted ? 1 : 0) + view.expectedDiscardLoss(i);
       if (cost < safestCost) {
         safest = i;
         safestCost = cost;
@@ -230,11 +230,20 @@ class PlayerView {
 
   double uselessProbability(int index) => _probability(index, _isDead);
 
-  /// Chance that discarding this card loses the last copy of a needed card.
-  double criticalProbability(int index) => _probability(
-    index,
-    (n, c) => !_isDead(n, c) && game.remaining(n, c) == 1,
-  );
+  /// Points of [Game.maxScore] expected to be lost by discarding this card,
+  /// averaged over what it could be. Jokers can stand in for lost cards, so
+  /// losing one 5 may cost nothing while losing a second one costs a point.
+  double expectedDiscardLoss(int index) {
+    final w = weights(index);
+    final total = w.values.fold(0, (a, b) => a + b);
+    if (total == 0) return 0;
+    final base = game.maxScore();
+    var loss = 0;
+    for (final MapEntry(key: (n, c), :value) in w.entries) {
+      loss += value * (base - game.maxScore(lost: [GameCard(n, c)]));
+    }
+    return loss / total;
+  }
 
   bool surelyPlayable(int index) {
     final options = candidates(index);
@@ -262,4 +271,31 @@ int safeActions(Game game) {
     if (view.surelyPlayable(i) || view.surelyUseless(i)) count++;
   }
   return count;
+}
+
+/// The pile where a 2-5 joker keeps the reachable score highest.
+CardColor bestJokerTarget(Game game, int index) {
+  final card = game.hand[index];
+  CardColor? best;
+  var bestMax = -1;
+  for (final c in CardColor.piles) {
+    if (!game.fireworks.fits(card, c)) continue;
+    final reach = (Game.copy(game)..play(index, target: c)).maxScore();
+    if (reach > bestMax) {
+      best = c;
+      bestMax = reach;
+    }
+  }
+  return best ?? CardColor.red;
+}
+
+/// Playing a joker the player knows about would use it up where a real
+/// card could still go, leaving it unable to cover a lost card elsewhere.
+/// Once the deck is empty the point now is worth more.
+bool wastesJoker(Game game, int index) {
+  final card = game.hand[index];
+  if (!card.isKnown || !card.isJoker || game.deckSize == 0) return false;
+  final target = game.needsTarget(index) ? bestJokerTarget(game, index) : null;
+  return (Game.copy(game)..play(index, target: target)).maxScore() <
+      game.maxScore();
 }

@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import '../game/card.dart';
 import '../game/game.dart';
 import 'simulated_player.dart';
 
@@ -40,7 +39,10 @@ int playOut(Game game, SimulatedPlayer player, {HintStats? stats}) {
     turns++;
     switch (player.decide(game)) {
       case PlayMove(:final index):
-        game.play(index, target: _jokerTarget(game, index));
+        game.play(
+          index,
+          target: game.needsTarget(index) ? bestJokerTarget(game, index) : null,
+        );
       case DiscardMove(:final index):
         game.discard(index);
       case HintMove():
@@ -54,17 +56,6 @@ int playOut(Game game, SimulatedPlayer player, {HintStats? stats}) {
     }
   }
   return turns;
-}
-
-/// The UI asks the human where to put a 2-5 joker; the simulated player
-/// takes the first pile it fits on.
-CardColor? _jokerTarget(Game game, int index) {
-  if (!game.needsTarget(index)) return null;
-  final card = game.hand[index];
-  return CardColor.piles.firstWhere(
-    (c) => game.fireworks.fits(card, c),
-    orElse: () => CardColor.red,
-  );
 }
 
 class BenchmarkReport {

@@ -31,9 +31,9 @@ cd rl
 uv sync
 (cd .. && dart run bin/export_parity.dart)   # reference games
 uv run pytest                                 # Python == Dart?
-uv run python -u train.py --name G_mixed --features v2 --players mixed --steps 3000000
+uv run python -u train.py --name H_v3 --features v3 --players mixed --steps 3000000
 uv run tensorboard --logdir runs              # learning curves
-uv run python export.py models/G_mixed.zip
+uv run python export.py models/H_v3.zip
 (cd .. && dart run bin/players.dart 3000)        # every strategy × player
 (cd .. && dart run bin/benchmark.dart 10000 --fast)
 ```
@@ -100,4 +100,30 @@ Mean score, 3,000 games per cell, both with the playFirst rule:
 | model | careful | cautious | balanced | bold |
 |---|---|---|---|---|
 | B (trained vs careful) | **16.69** | 16.13 | 16.66 | 16.93 |
-| **G (mixed players)** ← in the app | 16.58 | **16.60** | **17.18** | **17.42** |
+| **G (mixed players)** | 16.58 | **16.60** | **17.18** | **17.42** |
+
+
+## What is at stake: reachable score
+
+`Game.maxScore()` is the best score still reachable given the discards, with
+each unused joker filling one gap (losing one 5 costs nothing while the
+joker 5 is around; losing a second costs a point). Where the ~8 missing
+points went: ~6-7 by forced blind discards, ~1.6 by playing jokers where a
+real card could still go.
+
+Player changes: discard the card with the lowest *expected* loss of
+reachable score, and do not play a known joker if that lowers it (choose
+the pile where it helps most). Feature set v3 adds each card's discard loss
+and the reachable score.
+
+3,000 games per cell, all with the playFirst rule:
+
+| model | careful | cautious | balanced | bold |
+|---|---|---|---|---|
+| lookahead | 15.83 | 18.44 | 18.71 | 18.86 |
+| G (previous players) | **17.00** | 18.41 | 18.61 | 18.58 |
+| H_v2 (new players) | 16.95 | 18.42 | 18.68 | 18.71 |
+| **H_v3 (+ discard loss)** ← in the app | **17.04** | **18.51** | **18.79** | **18.88** |
+
+Most of the jump (from ~16.6 to ~18.6) came from the smarter players; the
+hint models now differ by tenths of a point.

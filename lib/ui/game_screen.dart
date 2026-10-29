@@ -398,6 +398,7 @@ class _StatusBar extends StatelessWidget {
           ),
           _stat(Icons.style, textMuted, '${game.deckSize}', 'deck'),
           _stat(Icons.star, accent, '${game.score}', 'score'),
+          _stat(Icons.flag_outlined, textMuted, '${game.maxScore()}', 'max'),
         ],
       ),
     );
@@ -407,19 +408,25 @@ class _StatusBar extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 18, color: color),
+                  const SizedBox(width: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           Text(label, style: const TextStyle(fontSize: 11, color: textMuted)),
         ],

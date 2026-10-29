@@ -178,4 +178,35 @@ void main() {
     }
     expect(card.knownNumber, isTrue);
   });
+
+  test(
+    'max score: a joker covers one lost 5, a second lost 5 costs a point',
+    () {
+      final game = Game(
+        deck: [for (var i = 0; i < 10; i++) GameCard(1, CardColor.red)],
+      );
+      expect(game.maxScore(), 25);
+      game.discarded.add(GameCard(5, CardColor.red));
+      expect(game.maxScore(), 25);
+      expect(game.discardLoss(GameCard(5, CardColor.blue)), 1);
+      game.discarded.add(GameCard(5, CardColor.blue));
+      expect(game.maxScore(), 24);
+    },
+  );
+
+  test(
+    'losing both 4s of a color caps that pile at 3 unless the joker helps',
+    () {
+      final game = Game(
+        deck: [for (var i = 0; i < 10; i++) GameCard(1, CardColor.red)],
+      );
+      game.discarded.addAll([
+        GameCard(4, CardColor.green),
+        GameCard(4, CardColor.green),
+      ]);
+      expect(game.maxScore(), 25); // the joker 4 fills the gap
+      game.discarded.add(GameCard(4, CardColor.joker));
+      expect(game.maxScore(), 23); // green stops at 3
+    },
+  );
 }

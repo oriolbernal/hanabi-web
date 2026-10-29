@@ -13,6 +13,10 @@ const slotFeatures = 19;
 const actionFeatures = 5;
 const observationSizeV2 = observationSize + actionCount * actionFeatures;
 
+/// Feature set v3 appends, per hand slot, the points the reachable score
+/// would drop if that card were discarded, and the reachable score itself.
+const observationSizeV3 = observationSizeV2 + handSize + 1;
+
 /// Actions 0-4 hint the numbers 1-5, actions 5-10 hint each color.
 const actionCount = 11;
 
@@ -75,6 +79,15 @@ List<double> encodeObservation(Game game) {
 List<double> encodeObservationV2(Game game) =>
     encodeObservation(game)..addAll(encodeActionEffects(game));
 
+/// v2 plus what is at stake: [Game.discardLoss] of each card and
+/// [Game.maxScore].
+List<double> encodeObservationV3(Game game) => encodeObservationV2(game)
+  ..addAll([
+    for (var i = 0; i < handSize; i++)
+      i < game.hand.length ? game.discardLoss(game.hand[i]) / 5 : 0,
+  ])
+  ..add(game.maxScore() / 25);
+
 /// For each of the [actionCount] hints, [actionFeatures] numbers describing
 /// its effect (all zero when the hint would reveal nothing):
 /// change in surely playable cards, change in surely useless cards, cards
@@ -128,6 +141,7 @@ class RlStrategy extends HintStrategy {
   }) : _encode = switch (weights['features'] ?? 'v1') {
          'v1' => encodeObservation,
          'v2' => encodeObservationV2,
+         'v3' => encodeObservationV3,
          final f => throw ArgumentError('unknown feature set $f'),
        },
        _layers = [
