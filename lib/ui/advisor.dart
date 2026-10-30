@@ -25,9 +25,9 @@ final Future<PlayerPolicy> loadAdvisor = rootBundle
 
 /// What the advisor knows and would do, from the player's point of view.
 class Advice {
-  Advice(Game game, PlayerPolicy agent)
+  Advice(Game game, SimulatedPlayer advisor)
     : odds = cardOdds(game),
-      move = agent.decide(game);
+      move = advisor.decide(game);
 
   final List<CardOdds> odds;
   final Move move;

@@ -44,6 +44,7 @@ abstract class Strings {
   String get devModeDetail;
   String modeLabel(HintMode m);
   String modeDescription(HintMode m);
+  String get thinking;
 
   // Game.
   String colorName(CardColor c);
@@ -100,6 +101,8 @@ class _English extends Strings {
   const _English();
 
   @override
+  String get thinking => 'Thinking of the best hint…';
+  @override
   String get subtitle => 'solitaire';
   @override
   String get hintsHeader => 'HINTS';
@@ -110,7 +113,7 @@ class _English extends Strings {
   @override
   String homeStats(Stats s) =>
       'Best ${s.best} · average ${decimal(s.average)} · last 10 '
-      '${decimal(s.recent())} · ${s.played} games';
+      '${decimal(s.recent())} · ${s.played} ${s.played == 1 ? 'game' : 'games'}';
   @override
   String get devMode => 'Dev mode';
   @override
@@ -120,12 +123,15 @@ class _English extends Strings {
     HintMode.classic => 'Classic',
     HintMode.smart => 'Smart',
     HintMode.ai => 'AI',
+    HintMode.search => 'Search',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
     HintMode.classic => 'The original rule: reveals what most cards share.',
     HintMode.smart => 'Tries every hint and picks the one that helps most.',
     HintMode.ai => 'A neural network trained on thousands of simulated games.',
+    HintMode.search =>
+      'Plays out every hint many times and gives the best one.',
   };
 
   @override
@@ -277,6 +283,8 @@ class _Catalan extends Strings {
       x.toStringAsFixed(digits).replaceAll('.', ',');
 
   @override
+  String get thinking => 'Pensant la millor pista…';
+  @override
   String get subtitle => 'solitari';
   @override
   String get hintsHeader => 'PISTES';
@@ -287,7 +295,8 @@ class _Catalan extends Strings {
   @override
   String homeStats(Stats s) =>
       'Millor ${s.best} · mitjana ${decimal(s.average)} · últimes 10 '
-      '${decimal(s.recent())} · ${s.played} partides';
+      '${decimal(s.recent())} · ${s.played} '
+      '${s.played == 1 ? 'partida' : 'partides'}';
   @override
   String get devMode => 'Mode dev';
   @override
@@ -297,6 +306,7 @@ class _Catalan extends Strings {
     HintMode.classic => 'Clàssic',
     HintMode.smart => 'Llest',
     HintMode.ai => 'IA',
+    HintMode.search => 'Cerca',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
@@ -305,6 +315,7 @@ class _Catalan extends Strings {
     HintMode.smart => 'Prova totes les pistes i tria la que més ajuda.',
     HintMode.ai =>
       'Una xarxa neuronal entrenada amb milers de partides simulades.',
+    HintMode.search => 'Juga cada pista moltes vegades i et dona la millor.',
   };
 
   @override
@@ -466,6 +477,8 @@ class _Spanish extends Strings {
       x.toStringAsFixed(digits).replaceAll('.', ',');
 
   @override
+  String get thinking => 'Pensando la mejor pista…';
+  @override
   String get subtitle => 'solitario';
   @override
   String get hintsHeader => 'PISTAS';
@@ -476,7 +489,8 @@ class _Spanish extends Strings {
   @override
   String homeStats(Stats s) =>
       'Mejor ${s.best} · media ${decimal(s.average)} · últimas 10 '
-      '${decimal(s.recent())} · ${s.played} partidas';
+      '${decimal(s.recent())} · ${s.played} '
+      '${s.played == 1 ? 'partida' : 'partidas'}';
   @override
   String get devMode => 'Modo dev';
   @override
@@ -486,6 +500,7 @@ class _Spanish extends Strings {
     HintMode.classic => 'Clásico',
     HintMode.smart => 'Listo',
     HintMode.ai => 'IA',
+    HintMode.search => 'Busca',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
@@ -494,6 +509,7 @@ class _Spanish extends Strings {
     HintMode.smart => 'Prueba todas las pistas y elige la que más ayuda.',
     HintMode.ai =>
       'Una red neuronal entrenada con miles de partidas simuladas.',
+    HintMode.search => 'Juega cada pista muchas veces y te da la mejor.',
   };
 
   @override

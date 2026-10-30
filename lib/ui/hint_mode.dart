@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../game/game.dart';
+import '../sim/hint_search.dart';
 import '../sim/rl_strategy.dart';
 import '../sim/smart_strategies.dart';
 import 'strings.dart';
@@ -11,7 +12,8 @@ import 'strings.dart';
 enum HintMode {
   classic,
   smart,
-  ai;
+  ai,
+  search;
 
   String get label => tr.modeLabel(this);
   String get description => tr.modeDescription(this);
@@ -20,6 +22,7 @@ enum HintMode {
     HintMode.classic => const DummyStrategy(),
     HintMode.smart => const LookaheadStrategy(),
     HintMode.ai => await _rlStrategy,
+    HintMode.search => SearchHints(),
   };
 
   static final Future<HintStrategy> _rlStrategy = rootBundle

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../game/card.dart';
 import '../game/game.dart';
-import '../sim/player_policy.dart';
+import '../sim/expert.dart';
+import '../sim/hint_search.dart';
 import '../sim/simulated_player.dart';
 import 'advisor.dart';
 import 'card_view.dart';
@@ -26,7 +27,7 @@ class _GameScreenState extends State<GameScreen> {
   int? _selected;
 
   /// Suggests moves and shows each card's odds (dev mode); null until loaded.
-  PlayerPolicy? _advisor;
+  SimulatedPlayer? _advisor;
   bool _showAdvice = true;
 
   /// Moves made so far, so the advice is computed once per move and not on
@@ -51,6 +52,12 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    // The search picks hints expecting the expert's way of playing, and the
+    // trained agent plays badly with them (17 instead of 21.5 points).
+    if (widget.strategy is SearchHints) {
+      _advisor = ExpertPlayer.tuned;
+      return;
+    }
     loadAdvisor.then((a) {
       if (mounted) setState(() => _advisor = a);
     });
@@ -108,12 +115,35 @@ class _GameScreenState extends State<GameScreen> {
     _checkEnd();
   }
 
-  void _hint() {
-    final hint = _game.hint();
-    if (hint == null) {
+  /// While the search hint giver is thinking: no other move meanwhile.
+  bool _thinking = false;
+
+  Future<void> _hint() async {
+    final Hint? picked;
+    if (widget.strategy case final SearchHints search) {
+      if (_game.usefulHints.isEmpty) {
+        _toast(tr.allKnown);
+        return;
+      }
+      setState(() => _thinking = true);
+      _toast(tr.thinking);
+      final chosen = await search.chooseWithin(
+        Game.copy(_game),
+        const Duration(milliseconds: 1500),
+      );
+      if (!mounted) return;
+      setState(() => _thinking = false);
+      if (chosen == null) return;
+      _game.giveHint(chosen);
+      picked = chosen;
+    } else {
+      picked = _game.hint();
+    }
+    if (picked == null) {
       _toast(tr.allKnown);
       return;
     }
+    final hint = picked;
     setState(() {
       _moves++;
       _revealed = switch (hint) {
@@ -359,7 +389,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.play,
             icon: Icons.auto_awesome,
             color: cardColor(CardColor.green),
-            onPressed: hasSelection ? _play : null,
+            onPressed: hasSelection && !_thinking ? _play : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -368,7 +398,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.discard,
             icon: Icons.delete_outline,
             color: cardColor(CardColor.red),
-            onPressed: hasSelection ? _discard : null,
+            onPressed: hasSelection && !_thinking ? _discard : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -377,7 +407,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.hint,
             icon: Icons.lightbulb_outline,
             color: hintColor,
-            onPressed: _game.hints > 0 ? _hint : null,
+            onPressed: _game.hints > 0 && !_thinking ? _hint : null,
           ),
         ),
       ],
