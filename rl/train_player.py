@@ -68,6 +68,11 @@ def main() -> None:
     parser.add_argument("--hints", default="../assets/models/hint_policy.json")
     parser.add_argument("--net", default="256,256")
     parser.add_argument("--resume", help="continue training a saved model")
+    parser.add_argument(
+        "--no-wasted-discards",
+        action="store_true",
+        help="mask discards with every hint token in hand, as the app does",
+    )
     args = parser.parse_args()
 
     torch.set_num_threads(1)
@@ -79,7 +84,12 @@ def main() -> None:
     baseline = np.mean([play_profile("bold", hints, s) for s in EVAL_SEEDS])
     print(f"bold player on eval games: {baseline:.2f}")
 
-    env = DummyVecEnv([lambda: PlayerEnv(args.hints, args.shaping) for _ in range(args.envs)])
+    env = DummyVecEnv(
+        [
+            lambda: PlayerEnv(args.hints, args.shaping, no_wasted_discards=args.no_wasted_discards)
+            for _ in range(args.envs)
+        ]
+    )
     env.seed(args.seed)
     callback = EvalCallback(100_000, out, hints)
     if args.resume:
