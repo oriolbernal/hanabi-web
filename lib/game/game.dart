@@ -96,10 +96,17 @@ class Game {
   /// right order, as if [lost] were discarded too. Each joker not yet used
   /// can fill the gap left by one lost card of its number, on any pile.
   int maxScore({List<GameCard> lost = const []}) {
+    // Thrown-away copies per (color, number), counted once.
+    final thrown = List.filled(CardColor.values.length * 6, 0);
+    for (final c in discarded) {
+      thrown[c.color.index * 6 + c.number]++;
+    }
+    for (final c in lost) {
+      thrown[c.color.index * 6 + c.number]++;
+    }
     bool gone(int n, CardColor c) {
       final total = c == CardColor.joker ? 1 : numberDistribution[n - 1];
-      bool same(GameCard x) => x.number == n && x.color == c;
-      return discarded.where(same).length + lost.where(same).length >= total;
+      return thrown[c.index * 6 + n] >= total;
     }
 
     final usedJokers = {
@@ -107,19 +114,25 @@ class Game {
         for (final card in fireworks.pile(c))
           if (card.isJoker) card.number,
     };
+    // Lowest gone number above each pile's top: the pile stops below it.
+    final gaps = <Set<int>>[];
+    var anyGap = false;
+    for (final c in CardColor.piles) {
+      final top = fireworks.top(c)?.number ?? 0;
+      final g = {
+        for (var n = top + 1; n <= 5; n++)
+          if (gone(n, c)) n,
+      };
+      anyGap |= g.isNotEmpty;
+      gaps.add(g);
+    }
+    if (!anyGap) return 25;
     final jokers = [
       for (var n = 1; n <= 5; n++)
-        if (!usedJokers.contains(n) && !gone(n, CardColor.joker)) n,
-    ];
-    final tops = [
-      for (final c in CardColor.piles) fireworks.top(c)?.number ?? 0,
-    ];
-    final gaps = [
-      for (var p = 0; p < tops.length; p++)
-        {
-          for (var n = tops[p] + 1; n <= 5; n++)
-            if (gone(n, CardColor.piles[p])) n,
-        },
+        if (!usedJokers.contains(n) &&
+            !gone(n, CardColor.joker) &&
+            gaps.any((g) => g.contains(n)))
+          n,
     ];
 
     int heights(List<Set<int>> g) {
@@ -195,6 +208,12 @@ class Game {
     hints--;
     applyHint(best);
     return best;
+  }
+
+  /// Gives [hint], chosen elsewhere, spending a token.
+  void giveHint(Hint hint) {
+    hints--;
+    applyHint(hint);
   }
 
   /// Reveals [hint] on the hand without spending a token.

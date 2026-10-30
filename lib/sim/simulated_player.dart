@@ -153,6 +153,7 @@ class PlayerView {
   PlayerView(this.game) {
     for (final c in game.discarded) {
       _seen.update(_key(c.number, c.color), (v) => v + 1, ifAbsent: () => 1);
+      _gone.update(_key(c.number, c.color), (v) => v + 1, ifAbsent: () => 1);
     }
     for (final color in CardColor.piles) {
       for (final c in game.fireworks.pile(color)) {
@@ -164,14 +165,27 @@ class PlayerView {
   final Game game;
   final Map<int, int> _seen = {};
 
+  /// Discarded copies per (number, color).
+  final Map<int, int> _gone = {};
+
+  /// Whether another copy of (number, color) stays in the game if one more
+  /// is thrown away; then losing one never lowers [Game.maxScore].
+  bool _hasSpare(int n, CardColor c) =>
+      c != CardColor.joker && _copies(n, c) - (_gone[_key(n, c)] ?? 0) >= 2;
+
   /// Reachable-score loss per (number, color); it only depends on the table.
   final Map<int, int> _losses = {};
   late final int _base = game.maxScore();
 
   int _loss(int n, CardColor c) => _losses.putIfAbsent(
     _key(n, c),
-    () => _base - game.maxScore(lost: [GameCard(n, c)]),
+    () => _hasSpare(n, c) || _isDead(n, c)
+        ? 0
+        : _base - game.maxScore(lost: [GameCard(n, c)]),
   );
+
+  /// Loss if the joker of number [n] were gone, per number.
+  final Map<int, int> _jokerLosses = {};
 
   static int _key(int number, CardColor color) => number * 10 + color.index;
 
@@ -179,7 +193,12 @@ class PlayerView {
       color == CardColor.joker ? 1 : numberDistribution[number - 1];
 
   /// Every (number, color) the card at [index] could still be.
-  List<(int, CardColor)> candidates(int index) {
+  List<(int, CardColor)> candidates(int index) =>
+      _candidates.putIfAbsent(index, () => _computeCandidates(index));
+
+  final Map<int, List<(int, CardColor)>> _candidates = {};
+
+  List<(int, CardColor)> _computeCandidates(int index) {
     final card = game.hand[index];
     return [
       for (final color in card.knownColor ? [card.color] : CardColor.values)
@@ -209,7 +228,12 @@ class PlayerView {
   /// How many copies of each candidate are still unaccounted for: not
   /// discarded, not played and not a fully known card elsewhere in hand.
   /// Each candidate's probability is proportional to its weight.
-  Map<(int, CardColor), int> weights(int index) {
+  Map<(int, CardColor), int> weights(int index) =>
+      _weights.putIfAbsent(index, () => _computeWeights(index));
+
+  final Map<int, Map<(int, CardColor), int>> _weights = {};
+
+  Map<(int, CardColor), int> _computeWeights(int index) {
     final inHand = <int, int>{};
     for (var j = 0; j < game.hand.length; j++) {
       final c = game.hand[j];
@@ -261,17 +285,24 @@ class PlayerView {
   /// it: the last copy of a needed card, which only the joker can stand in for.
   final Map<int, int> _lossesWithoutJoker = {};
 
-  int _lossWithoutJoker(int n, CardColor c) => _lossesWithoutJoker.putIfAbsent(
-    _key(n, c),
-    () =>
-        _base -
-        game.maxScore(
-          lost: [
-            GameCard(n, c),
-            if (c != CardColor.joker) GameCard(n, CardColor.joker),
-          ],
-        ),
-  );
+  int _lossWithoutJoker(int n, CardColor c) =>
+      _lossesWithoutJoker.putIfAbsent(_key(n, c), () {
+        if (_isDead(n, c)) return 0;
+        // With a spare copy, only the joker's absence can matter.
+        if (_hasSpare(n, c)) {
+          return _jokerLosses.putIfAbsent(
+            n,
+            () => _base - game.maxScore(lost: [GameCard(n, CardColor.joker)]),
+          );
+        }
+        return _base -
+            game.maxScore(
+              lost: [
+                GameCard(n, c),
+                if (c != CardColor.joker) GameCard(n, CardColor.joker),
+              ],
+            );
+      });
 
   /// Like [expectedDiscardLoss], but discarding the last copy of a card that
   /// a joker would have to replace also costs [jokerReserve]: it spends the
