@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../game/card.dart';
 import '../game/game.dart';
 import '../sim/player_policy.dart';
+import '../sim/simulated_player.dart';
 import 'advisor.dart';
 import 'card_view.dart';
 import 'hint_mode.dart';
@@ -260,6 +261,9 @@ class _GameScreenState extends State<GameScreen> {
                 final cardWidth = ((constraints.maxWidth - 32 - 4 * 10) / 5)
                     .clamp(40.0, 84.0);
                 final advice = _currentAdvice();
+                final possible = Settings.devMode.value
+                    ? possibleCards(_game)
+                    : null;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -310,6 +314,7 @@ class _GameScreenState extends State<GameScreen> {
                                         outline: advice?.cardIndex == i
                                             ? advice!.color
                                             : null,
+                                        possible: possible?[i],
                                         onTap: () => setState(
                                           () => _selected = _selected == i
                                               ? null
@@ -682,4 +687,27 @@ class _Discards extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What each card in hand can still be, given the hints and every card in
+/// sight: all copies of a card on the piles, discarded or known in hand
+/// rule it out.
+List<Possible> possibleCards(Game game) {
+  final view = PlayerView(game);
+  return [
+    for (var i = 0; i < game.hand.length; i++)
+      () {
+        final options = view.weights(i).keys;
+        return (
+          numbers: [
+            for (var n = 1; n <= 5; n++)
+              if (options.any((o) => o.$1 == n)) n,
+          ],
+          colors: [
+            for (final c in CardColor.values)
+              if (options.any((o) => o.$2 == c)) c,
+          ],
+        );
+      }(),
+  ];
 }

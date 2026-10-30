@@ -12,6 +12,7 @@ class CardView extends StatelessWidget {
     this.selected = false,
     this.highlighted = false,
     this.outline,
+    this.possible,
     this.onTap,
   });
 
@@ -22,6 +23,11 @@ class CardView extends StatelessWidget {
 
   /// A colored border, e.g. for the advisor's suggestion.
   final Color? outline;
+
+  /// What the card can still be, when known better than from the hints
+  /// alone (dev mode deduces it from every card in sight). Null shows only
+  /// what hints ruled out.
+  final Possible? possible;
   final VoidCallback? onTap;
 
   @override
@@ -54,6 +60,18 @@ class CardView extends StatelessWidget {
     );
 
     final fg = color == null ? textMuted : onCardColor(color);
+    final numbers =
+        possible?.numbers ??
+        [
+          for (var n = 1; n <= 5; n++)
+            if (!card.notNumbers.contains(n)) n,
+        ];
+    final colors =
+        possible?.colors ??
+        [
+          for (final c in CardColor.values)
+            if (!card.notColors.contains(c)) c,
+        ];
 
     return GestureDetector(
       onTap: onTap,
@@ -86,16 +104,13 @@ class CardView extends StatelessWidget {
                 ),
               ),
             // What hints ruled out, shown as what is still possible.
-            if (!card.knownNumber && card.notNumbers.isNotEmpty)
+            if (!card.knownNumber && numbers.length < 5)
               Positioned(
                 top: width * 0.07,
                 left: 0,
                 right: 0,
                 child: Text(
-                  [
-                    for (var n = 1; n <= 5; n++)
-                      if (!card.notNumbers.contains(n)) '$n',
-                  ].join(' '),
+                  [for (final n in numbers) '$n'].join(' '),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: fg,
@@ -104,12 +119,12 @@ class CardView extends StatelessWidget {
                   ),
                 ),
               ),
-            if (color == null && card.notColors.isNotEmpty)
+            if (color == null && colors.length < CardColor.values.length)
               Positioned(
                 bottom: width * 0.09,
                 left: 0,
                 right: 0,
-                child: _PossibleColors(card: card, size: width * 0.11),
+                child: _PossibleColors(colors: colors, size: width * 0.11),
               )
             else if (color == null && card.knownNumber)
               Positioned(
@@ -127,11 +142,14 @@ class CardView extends StatelessWidget {
   }
 }
 
+/// The numbers and colors a card in hand can still be, in order.
+typedef Possible = ({List<int> numbers, List<CardColor> colors});
+
 /// Dots for the colors a card can still be, after the ruled-out ones.
 class _PossibleColors extends StatelessWidget {
-  const _PossibleColors({required this.card, required this.size});
+  const _PossibleColors({required this.colors, required this.size});
 
-  final GameCard card;
+  final List<CardColor> colors;
   final double size;
 
   @override
@@ -139,18 +157,17 @@ class _PossibleColors extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        for (final c in CardColor.values)
-          if (!card.notColors.contains(c))
-            Container(
-              width: size,
-              height: size,
-              margin: EdgeInsets.symmetric(horizontal: size * 0.15),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: c == CardColor.joker ? null : cardColor(c),
-                gradient: c == CardColor.joker ? jokerGradient : null,
-              ),
+        for (final c in colors)
+          Container(
+            width: size,
+            height: size,
+            margin: EdgeInsets.symmetric(horizontal: size * 0.15),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: c == CardColor.joker ? null : cardColor(c),
+              gradient: c == CardColor.joker ? jokerGradient : null,
             ),
+          ),
       ],
     );
   }
