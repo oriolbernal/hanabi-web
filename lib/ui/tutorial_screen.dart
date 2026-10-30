@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../game/card.dart';
-import '../game/game.dart';
 import 'card_view.dart';
 import 'palette.dart';
+import 'strings.dart';
 
 class _Step {
   const _Step(this.title, this.text, this.cards);
@@ -12,89 +12,53 @@ class _Step {
   final List<GameCard> cards;
 }
 
+/// The texts come from [Strings.tutorial], in the same order.
+List<_Step> get _steps => [
+  for (final (i, (title, text)) in tr.tutorial.indexed)
+    _Step(title, text, _cards[i]),
+];
+
 GameCard _card(int n, CardColor c, {bool number = false, bool color = false}) =>
     GameCard(n, c)
       ..knownNumber = number
       ..knownColor = color;
 
-final _steps = [
-  _Step(
-    'The goal',
-    'Each card has a NUMBER and a COLOR. Build one firework per color by '
-        'stacking its cards in order, from 1 to 5. A perfect show scores 25.',
-    [
-      for (var n = 1; n <= 5; n++)
-        _card(n, CardColor.red, number: true, color: true),
-    ],
-  ),
-  _Step(
-    'Your hand',
-    'You hold $handSize cards, but you cannot see them. '
-        'Tap a card to select it, then play or discard it.',
-    [
-      _card(2, CardColor.red),
-      _card(1, CardColor.green),
-      _card(5, CardColor.blue),
-      _card(1, CardColor.yellow),
-      _card(1, CardColor.white),
-    ],
-  ),
-  _Step(
-    'Hints',
-    'Ask for a hint to reveal all your cards sharing a number or a color. '
-        'You have $maxHints hint tokens; discarding a card gives one back.',
-    [
-      _card(2, CardColor.red),
-      _card(1, CardColor.green, number: true),
-      _card(5, CardColor.blue),
-      _card(1, CardColor.yellow, number: true),
-      _card(1, CardColor.white, number: true),
-    ],
-  ),
-  _Step(
-    'What hints rule out',
-    'A hint also tells you about the cards it does not touch. After "these '
-        'are your 1s", the others show the numbers they can still be; after '
-        '"these are green", the dots show the colors still possible.',
-    [
-      _card(2, CardColor.red)
-        ..notNumbers.add(1)
-        ..notColors.add(CardColor.green),
-      _card(1, CardColor.green, number: true, color: true),
-      _card(5, CardColor.blue)
-        ..notNumbers.add(1)
-        ..notColors.add(CardColor.green),
-      _card(1, CardColor.yellow, number: true)..notColors.add(CardColor.green),
-      _card(3, CardColor.green, color: true)..notNumbers.add(1),
-    ],
-  ),
-  _Step(
-    'Misfires',
-    'Playing a card that does not fit costs a life. '
-        'Lose $allowedErrors lives and the show is over. '
-        'The game also ends when the deck and your hand run out.',
-    [],
-  ),
-  _Step(
-    'Jokers',
-    'There are five rainbow jokers, numbered 1 to 5. A joker can go on any '
-        'firework. A joker 1 takes the first free spot, marked "wild", and '
-        'steps aside if a real 1 needs it. For higher jokers you choose the '
-        'firework. Keep them for where they are needed: each joker can '
-        'replace one lost card.',
-    [
-      for (var n = 1; n <= 3; n++)
-        _card(n, CardColor.joker, number: true, color: true),
-    ],
-  ),
-  _Step(
-    'Max score',
-    'The flag in the top bar shows the best score still reachable. It drops '
-        'when every copy of a card you needed is gone, so discard carefully: '
-        'losing one 5 costs nothing while the joker 5 can replace it, a '
-        'second one costs a point.',
-    [],
-  ),
+final _cards = <List<GameCard>>[
+  [
+    for (var n = 1; n <= 5; n++)
+      _card(n, CardColor.red, number: true, color: true),
+  ],
+  [
+    _card(2, CardColor.red),
+    _card(1, CardColor.green),
+    _card(5, CardColor.blue),
+    _card(1, CardColor.yellow),
+    _card(1, CardColor.white),
+  ],
+  [
+    _card(2, CardColor.red),
+    _card(1, CardColor.green, number: true),
+    _card(5, CardColor.blue),
+    _card(1, CardColor.yellow, number: true),
+    _card(1, CardColor.white, number: true),
+  ],
+  [
+    _card(2, CardColor.red)
+      ..notNumbers.add(1)
+      ..notColors.add(CardColor.green),
+    _card(1, CardColor.green, number: true, color: true),
+    _card(5, CardColor.blue)
+      ..notNumbers.add(1)
+      ..notColors.add(CardColor.green),
+    _card(1, CardColor.yellow, number: true)..notColors.add(CardColor.green),
+    _card(3, CardColor.green, color: true)..notNumbers.add(1),
+  ],
+  [],
+  [
+    for (var n = 1; n <= 3; n++)
+      _card(n, CardColor.joker, number: true, color: true),
+  ],
+  [],
 ];
 
 class TutorialScreen extends StatefulWidget {
@@ -116,11 +80,12 @@ class _TutorialScreenState extends State<TutorialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final last = _page == _steps.length - 1;
+    final steps = _steps;
+    final last = _page == steps.length - 1;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('How to play'),
+        title: Text(tr.howToPlay),
       ),
       body: SafeArea(
         child: Center(
@@ -132,13 +97,13 @@ class _TutorialScreenState extends State<TutorialScreen> {
                   child: PageView(
                     controller: _controller,
                     onPageChanged: (p) => setState(() => _page = p),
-                    children: [for (final s in _steps) _buildStep(s)],
+                    children: [for (final s in steps) _buildStep(s)],
                   ),
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    for (var i = 0; i < _steps.length; i++)
+                    for (var i = 0; i < steps.length; i++)
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         margin: const EdgeInsets.all(4),
@@ -164,7 +129,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                             ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Text(last ? 'Got it!' : 'Next'),
+                        child: Text(last ? tr.gotIt : tr.next),
                       ),
                     ),
                   ),

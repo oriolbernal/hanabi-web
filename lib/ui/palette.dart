@@ -35,12 +35,3 @@ Color onCardColor(CardColor c) => switch (c) {
   CardColor.yellow || CardColor.white => const Color(0xFF1A1A1A),
   _ => Colors.white,
 };
-
-String colorName(CardColor c) => switch (c) {
-  CardColor.red => 'red',
-  CardColor.green => 'green',
-  CardColor.blue => 'blue',
-  CardColor.yellow => 'yellow',
-  CardColor.white => 'white',
-  CardColor.joker => 'joker',
-};

@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final mode in HintMode.values) {
-    test('${mode.label} mode gives useful hints', () async {
+    test('${mode.name} mode gives useful hints', () async {
       final game = Game(strategy: await mode.load());
       final options = game.usefulHints;
       expect(options, contains(game.hint()));

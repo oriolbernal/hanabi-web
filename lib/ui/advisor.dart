@@ -8,6 +8,7 @@ import '../game/game.dart';
 import '../sim/player_policy.dart';
 import '../sim/simulated_player.dart';
 import 'palette.dart';
+import 'strings.dart';
 
 /// The trained player agent, loaded once from the app's assets.
 final Future<PlayerPolicy> loadAdvisor = rootBundle
@@ -41,11 +42,12 @@ class Advice {
   };
 
   String describe() => switch (move) {
-    PlayMove(:final index) =>
-      'Play card ${index + 1} · ${_pct(odds[index].play)} it fits',
-    DiscardMove(:final index) =>
-      'Discard card ${index + 1} · costs ${odds[index].discardLoss.toStringAsFixed(1)} pts',
-    HintMove() => 'Ask for a hint',
+    PlayMove(:final index) => tr.advicePlay(index + 1, _pct(odds[index].play)),
+    DiscardMove(:final index) => tr.adviceDiscard(
+      index + 1,
+      tr.decimal(odds[index].discardLoss),
+    ),
+    HintMove() => tr.adviceHint,
   };
 }
 

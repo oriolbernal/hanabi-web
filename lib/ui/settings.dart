@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'strings.dart';
+
 /// Preferences remembered between sessions.
 class Settings {
   Settings._();
@@ -12,9 +14,19 @@ class Settings {
   /// Shows the AI advisor (suggested move and odds per card) in games.
   static final devMode = ValueNotifier(false);
 
+  static const _languageKey = 'language';
+
+  /// Language of every text in the app; the device's until one is chosen.
+  static final language = ValueNotifier(Language.system);
+
   static Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_languageKey);
+      language.value = Language.values.firstWhere(
+        (l) => l.name == saved,
+        orElse: () => Language.system,
+      );
       devMode.value = prefs.getBool(_devModeKey) ?? false;
       stats.value = Stats([
         for (final s in prefs.getStringList(_scoresKey) ?? []) int.parse(s),
@@ -42,6 +54,14 @@ class Settings {
       ]);
     } catch (_) {}
     return isRecord;
+  }
+
+  static Future<void> setLanguage(Language l) async {
+    language.value = l;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languageKey, l.name);
+    } catch (_) {}
   }
 
   static Future<void> setDevMode(bool on) async {

@@ -8,6 +8,7 @@ import 'card_view.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
 import 'settings.dart';
+import 'strings.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key, required this.mode, required this.strategy});
@@ -88,10 +89,7 @@ class _GameScreenState extends State<GameScreen> {
       _moves++;
     });
     if (result case PlayFailure(:final card)) {
-      _toast(
-        'Misfire! That card was a ${card.number} ${colorName(card.color)}.',
-        color: const Color(0xFF8C1D24),
-      );
+      _toast(tr.misfire(card), color: const Color(0xFF8C1D24));
     }
     _checkEnd();
   }
@@ -105,14 +103,14 @@ class _GameScreenState extends State<GameScreen> {
       _revealed = {};
       _moves++;
     });
-    _toast('Discarded a ${card.number} ${colorName(card.color)}.');
+    _toast(tr.discarded(card));
     _checkEnd();
   }
 
   void _hint() {
     final hint = _game.hint();
     if (hint == null) {
-      _toast('You already know all your cards. Play or discard them.');
+      _toast(tr.allKnown);
       return;
     }
     setState(() {
@@ -125,10 +123,8 @@ class _GameScreenState extends State<GameScreen> {
       };
     });
     _toast(switch (hint) {
-      NumberHint(:final number) => 'Hint: these are your ${number}s.',
-      ColorHint(color: CardColor.joker) => 'Hint: these are your jokers.',
-      ColorHint(:final color) =>
-        'Hint: these are your ${colorName(color)} cards.',
+      NumberHint(:final number) => tr.numberHint(number),
+      ColorHint(:final color) => tr.colorHint(color),
     });
   }
 
@@ -142,9 +138,12 @@ class _GameScreenState extends State<GameScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "It's a joker! Choose where to play it",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              Text(
+                tr.chooseJokerPile,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -179,26 +178,21 @@ class _GameScreenState extends State<GameScreen> {
         backgroundColor: surface,
         title: Text(
           won
-              ? 'Perfect show! 🎆'
+              ? tr.perfectShow
               : record
-              ? 'New record! 🎉'
-              : 'The show is over',
+              ? tr.newRecord
+              : tr.showOver,
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Your score is ${_game.score} / 25',
+              tr.yourScore(_game.score),
               style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 12),
-            Text(
-              'Best ${stats.best} · average '
-              '${stats.average.toStringAsFixed(1)} over ${stats.played} '
-              '${stats.played == 1 ? 'game' : 'games'}',
-              style: const TextStyle(color: textMuted),
-            ),
+            Text(tr.endStats(stats), style: const TextStyle(color: textMuted)),
           ],
         ),
         actions: [
@@ -207,14 +201,14 @@ class _GameScreenState extends State<GameScreen> {
               Navigator.pop(context);
               Navigator.pop(this.context);
             },
-            child: const Text('Menu'),
+            child: Text(tr.menu),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
               _restart();
             },
-            child: const Text('Play again'),
+            child: Text(tr.playAgain),
           ),
         ],
       ),
@@ -233,7 +227,7 @@ class _GameScreenState extends State<GameScreen> {
               style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.w800),
             ),
             Text(
-              '${widget.mode.label} hints',
+              tr.hintsSubtitle(widget.mode.label),
               style: const TextStyle(fontSize: 12, color: textMuted),
             ),
           ],
@@ -241,7 +235,7 @@ class _GameScreenState extends State<GameScreen> {
         actions: [
           if (Settings.devMode.value)
             IconButton(
-              tooltip: _showAdvice ? 'Hide advice' : 'Show advice',
+              tooltip: _showAdvice ? tr.hideAdvice : tr.showAdvice,
               icon: Icon(
                 _showAdvice
                     ? Icons.tips_and_updates
@@ -251,7 +245,7 @@ class _GameScreenState extends State<GameScreen> {
               onPressed: () => setState(() => _showAdvice = !_showAdvice),
             ),
           IconButton(
-            tooltip: 'New game',
+            tooltip: tr.newGame,
             icon: const Icon(Icons.refresh),
             onPressed: _restart,
           ),
@@ -272,7 +266,7 @@ class _GameScreenState extends State<GameScreen> {
                     children: [
                       _StatusBar(game: _game),
                       const SizedBox(height: 20),
-                      _sectionLabel('FIREWORKS'),
+                      _sectionLabel(tr.fireworks),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -286,7 +280,7 @@ class _GameScreenState extends State<GameScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      _sectionLabel('DISCARDS'),
+                      _sectionLabel(tr.discards),
                       Expanded(
                         child: SizedBox(
                           width: double.infinity,
@@ -295,7 +289,7 @@ class _GameScreenState extends State<GameScreen> {
                       ),
                       _messageBar(),
                       const SizedBox(height: 12),
-                      _sectionLabel('YOUR HAND'),
+                      _sectionLabel(tr.yourHand),
                       if (advice != null) _suggestion(advice),
                       const SizedBox(height: 12),
                       Row(
@@ -357,7 +351,7 @@ class _GameScreenState extends State<GameScreen> {
       children: [
         Expanded(
           child: _actionButton(
-            label: 'Play',
+            label: tr.play,
             icon: Icons.auto_awesome,
             color: cardColor(CardColor.green),
             onPressed: hasSelection ? _play : null,
@@ -366,7 +360,7 @@ class _GameScreenState extends State<GameScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _actionButton(
-            label: 'Discard',
+            label: tr.discard,
             icon: Icons.delete_outline,
             color: cardColor(CardColor.red),
             onPressed: hasSelection ? _discard : null,
@@ -375,7 +369,7 @@ class _GameScreenState extends State<GameScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _actionButton(
-            label: 'Hint',
+            label: tr.hint,
             icon: Icons.lightbulb_outline,
             color: hintColor,
             onPressed: _game.hints > 0 ? _hint : null,
@@ -434,7 +428,7 @@ class _GameScreenState extends State<GameScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          _message ?? 'Tap a card to select it',
+          _message ?? tr.tapCard,
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _message == null ? textMuted : Colors.white,
@@ -464,7 +458,7 @@ class _GameScreenState extends State<GameScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'AI: ${advice.describe()}',
+                '${tr.ai}: ${advice.describe()}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -510,17 +504,22 @@ class _StatusBar extends StatelessWidget {
             Icons.lightbulb,
             const Color(0xFF7CC4FF),
             '${game.hints}/$maxHints',
-            'hints',
+            tr.hintsStat,
           ),
           _stat(
             Icons.local_fire_department,
             const Color(0xFFE5484D),
             '${game.errors}/$allowedErrors',
-            'lives',
+            tr.livesStat,
           ),
-          _stat(Icons.style, textMuted, '${game.deckSize}', 'deck'),
-          _stat(Icons.star, accent, '${game.score}', 'score'),
-          _stat(Icons.flag_outlined, textMuted, '${game.maxScore()}', 'max'),
+          _stat(Icons.style, textMuted, '${game.deckSize}', tr.deckStat),
+          _stat(Icons.star, accent, '${game.score}', tr.scoreStat),
+          _stat(
+            Icons.flag_outlined,
+            textMuted,
+            '${game.maxScore()}',
+            tr.maxStat,
+          ),
         ],
       ),
     );
@@ -608,7 +607,7 @@ class _PileView extends StatelessWidget {
               child: OverflowBox(
                 maxHeight: 14,
                 child: Text(
-                  'wild',
+                  tr.wild,
                   style: TextStyle(
                     fontSize: 11,
                     height: 1,
@@ -641,11 +640,11 @@ class _Discards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cards.isEmpty) {
-      return const Align(
+      return Align(
         alignment: Alignment.topLeft,
         child: Text(
-          'Nothing discarded yet',
-          style: TextStyle(color: textMuted, fontStyle: FontStyle.italic),
+          tr.noDiscards,
+          style: const TextStyle(color: textMuted, fontStyle: FontStyle.italic),
         ),
       );
     }

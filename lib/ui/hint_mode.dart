@@ -5,16 +5,16 @@ import 'package:flutter/services.dart';
 import '../game/game.dart';
 import '../sim/rl_strategy.dart';
 import '../sim/smart_strategies.dart';
+import 'strings.dart';
 
 /// Who chooses the hint when you press *Hint*.
 enum HintMode {
-  classic('Classic', 'The original rule: reveals what most cards share.'),
-  smart('Smart', 'Tries every hint and picks the one that helps most.'),
-  ai('AI', 'A neural network trained on thousands of simulated games.');
+  classic,
+  smart,
+  ai;
 
-  const HintMode(this.label, this.description);
-  final String label;
-  final String description;
+  String get label => tr.modeLabel(this);
+  String get description => tr.modeDescription(this);
 
   Future<HintStrategy> load() async => switch (this) {
     HintMode.classic => const DummyStrategy(),

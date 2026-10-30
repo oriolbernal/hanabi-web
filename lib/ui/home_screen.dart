@@ -5,6 +5,7 @@ import 'game_screen.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
 import 'settings.dart';
+import 'strings.dart';
 import 'tutorial_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -32,15 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _modeSelector() {
     return Column(
       children: [
-        const Text(
-          'HINTS',
-          style: TextStyle(
-            color: textMuted,
-            fontSize: 12,
-            letterSpacing: 2,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(tr.hintsHeader, style: _headerStyle),
         const SizedBox(height: 8),
         SegmentedButton<HintMode>(
           showSelectedIcon: false,
@@ -61,6 +54,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  static const _headerStyle = TextStyle(
+    color: textMuted,
+    fontSize: 12,
+    letterSpacing: 2,
+    fontWeight: FontWeight.w600,
+  );
+
+  Widget _languageSelector() {
+    return SegmentedButton<Language>(
+      showSelectedIcon: false,
+      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      segments: [
+        for (final l in Language.values)
+          ButtonSegment(value: l, label: Text(l.label)),
+      ],
+      selected: {Settings.language.value},
+      onSelectionChanged: (s) async {
+        await Settings.setLanguage(s.first);
+        setState(() {});
+      },
     );
   }
 
@@ -105,24 +121,29 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 12,
                     ),
                   ),
-                  const Text(
-                    'solitaire',
-                    style: TextStyle(
+                  Text(
+                    tr.subtitle,
+                    style: const TextStyle(
                       fontSize: 16,
                       color: textMuted,
                       letterSpacing: 4,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 28),
+                  SizedBox(width: 280, child: _languageSelector()),
+                  const SizedBox(height: 24),
                   SizedBox(width: 280, child: _modeSelector()),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: 240,
                     child: FilledButton(
                       onPressed: _play,
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Text('Play', style: TextStyle(fontSize: 18)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          tr.play,
+                          style: const TextStyle(fontSize: 18),
+                        ),
                       ),
                     ),
                   ),
@@ -136,11 +157,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           builder: (_) => const TutorialScreen(),
                         ),
                       ),
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
                         child: Text(
-                          'How to play',
-                          style: TextStyle(fontSize: 18),
+                          tr.howToPlay,
+                          style: const TextStyle(fontSize: 18),
                         ),
                       ),
                     ),
@@ -151,10 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, stats, _) => stats.played == 0
                         ? const SizedBox.shrink()
                         : Text(
-                            'Best ${stats.best} · average '
-                            '${stats.average.toStringAsFixed(1)} · last 10 '
-                            '${stats.recent().toStringAsFixed(1)} · '
-                            '${stats.played} games',
+                            tr.homeStats(stats),
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: textMuted),
                           ),
@@ -167,13 +185,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: SwitchListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Dev mode',
-                          style: TextStyle(color: textMuted),
+                        title: Text(
+                          tr.devMode,
+                          style: const TextStyle(color: textMuted),
                         ),
-                        subtitle: const Text(
-                          'AI advisor and odds in game',
-                          style: TextStyle(color: textMuted, fontSize: 12),
+                        subtitle: Text(
+                          tr.devModeDetail,
+                          style: const TextStyle(
+                            color: textMuted,
+                            fontSize: 12,
+                          ),
                         ),
                         value: dev,
                         onChanged: Settings.setDevMode,
