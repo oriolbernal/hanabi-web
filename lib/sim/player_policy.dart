@@ -106,6 +106,9 @@ class PlayerPolicy extends SimulatedPlayer {
     this.name = 'agent',
     this.noWastedDiscards = false,
     this.safeDiscardMargin,
+    this.uselessFirst = false,
+    this.keepPlayable,
+    this.hintsBeforeBlind,
   }) : _net = Mlp(weights);
 
   final Mlp _net;
@@ -130,14 +133,47 @@ class PlayerPolicy extends SimulatedPlayer {
   /// lives in 16% of games instead of 23%.
   static const appSafeDiscardMargin = 0.1;
 
-  @override
-  Move decide(Game game) {
+  /// Rule on top of the network: a card that surely cannot be played any
+  /// more is always the first one to discard (free in simulation, +0.03).
+  final bool uselessFirst;
+
+  /// Rule on top of the network: never discard a card at least this likely
+  /// to be playable; ask for a hint instead, or discard the least playable
+  /// card when no hint can be asked. Null turns the rule off.
+  final double? keepPlayable;
+
+  /// The threshold the app uses. People do not throw away a card that is
+  /// nearly as likely as not to be playable; over 2000 simulated games this
+  /// costs 0.13 points (±0.10), a lower threshold costs much more.
+  static const appKeepPlayable = 0.4;
+
+  /// Rule on top of the network: with at least this many hint tokens, ask
+  /// for a hint instead of discarding a card not known to be useless, so
+  /// discards are made knowing more. Null turns the rule off.
+  final int? hintsBeforeBlind;
+
+  /// Actions allowed by the game and by the rules above the network.
+  List<bool> ruleMask(Game game) {
     final mask = playerActionMask(game);
     if (noWastedDiscards && game.hints == maxHints && mask[askAction]) {
       for (var i = handSize; i < 2 * handSize; i++) {
         mask[i] = false;
       }
     }
+    return mask;
+  }
+
+  List<int> legalActions(Game game) {
+    final mask = ruleMask(game);
+    return [
+      for (var a = 0; a < playerActionCount; a++)
+        if (mask[a]) a,
+    ];
+  }
+
+  @override
+  Move decide(Game game) {
+    final mask = ruleMask(game);
     final scores = _net(encodePlayerObservation(game));
     var best = -1;
     for (var a = 0; a < playerActionCount; a++) {
@@ -145,15 +181,29 @@ class PlayerPolicy extends SimulatedPlayer {
     }
     if (best == askAction) return HintMove();
     if (best < handSize) return PlayMove(best);
-    final chosen = best - handSize;
+    var chosen = best - handSize;
+    final view = PlayerView(game);
+    final n = game.hand.length;
+    final canHint = mask[askAction];
+    if (uselessFirst) {
+      for (var i = 0; i < n; i++) {
+        if (view.surelyUseless(i)) return DiscardMove(i);
+      }
+    }
+    final blind = hintsBeforeBlind;
+    if (blind != null && canHint && game.hints >= blind) return HintMove();
+    final keep = keepPlayable;
+    if (keep != null && view.playProbability(chosen) >= keep) {
+      if (canHint) return HintMove();
+      for (var i = 0; i < n; i++) {
+        if (view.playProbability(i) < view.playProbability(chosen)) chosen = i;
+      }
+    }
     final margin = safeDiscardMargin;
     if (margin == null) return DiscardMove(chosen);
-    final view = PlayerView(game);
-    final risk = [
-      for (var i = 0; i < game.hand.length; i++) view.expectedDiscardRisk(i),
-    ];
+    final risk = [for (var i = 0; i < n; i++) view.expectedDiscardRisk(i)];
     var safest = chosen;
-    for (var i = 0; i < game.hand.length; i++) {
+    for (var i = 0; i < n; i++) {
       // Never trade for a card that might be played now.
       if (view.playProbability(i) > 0) continue;
       if (risk[i] < risk[safest]) safest = i;

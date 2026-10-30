@@ -18,6 +18,8 @@ final Future<PlayerPolicy> loadAdvisor = rootBundle
         jsonDecode(json) as Map<String, dynamic>,
         noWastedDiscards: true,
         safeDiscardMargin: PlayerPolicy.appSafeDiscardMargin,
+        uselessFirst: true,
+        keepPlayable: PlayerPolicy.appKeepPlayable,
       ),
     );
 
