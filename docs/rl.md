@@ -279,6 +279,27 @@ Resultat en **4.000 partides de test noves** (marge ±0,09-0,12):
   a ≈0,85: el crític aprèn a estimar bé quants punts queden, i això fa que el
   senyal d'aprenentatge de la política sigui cada vegada més net.
 
+### 5.9 Regles de l'assistent trobades jugant
+
+Dues fallades que vas detectar jugant s'han corregit amb una regla per sobre de
+la xarxa, sense reentrenar-la (mesurat amb les mateixes 3000 partides):
+
+| Regla | Què evita | Puntuació |
+|---|---|---|
+| Cap — només la xarxa | | 20,16 |
+| No descartar amb les 10 pistes | Descartar sense recuperar cap pista | 20,22 |
+| + Descart segur (marge 0,1) | Descartar una carta desconeguda que pot ser l'únic 5 quan hi ha un 3 conegut amb còpia | **20,41** (+0,19 ± 0,10) |
+
+El descart segur fa servir un **risc** que també compta el comodí. Perdre un 5
+no costa punts mentre el comodí 5 el pugui substituir, però gasta aquest
+comodí. Per això es compta com mig punt. La pèrdua sola valia 0 per a totes les
+cartes de la mà i la xarxa no les podia distingir.
+
+La primera versió de la regla baixava a 17,9: canviava el descart per un 1
+conegut i jugable, que també té risc 0. Ara només canvia a cartes que segur que
+no es poden jugar, i també baixen les partides perdudes per vides (del 23% al
+16%).
+
 ## 6. Lliçons
 
 1. **Mesurar abans de canviar.** Cada salt gran ha vingut d'una mesura que ens

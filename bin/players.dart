@@ -40,6 +40,8 @@ void main(List<String> args) {
     if (File('assets/models/player_policy.json').existsSync())
       PlayerPolicy(
         jsonDecode(File('assets/models/player_policy.json').readAsStringSync()),
+        noWastedDiscards: true,
+        safeDiscardMargin: PlayerPolicy.appSafeDiscardMargin,
       ),
   ];
 

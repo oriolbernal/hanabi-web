@@ -17,6 +17,7 @@ final Future<PlayerPolicy> loadAdvisor = rootBundle
       (json) => PlayerPolicy(
         jsonDecode(json) as Map<String, dynamic>,
         noWastedDiscards: true,
+        safeDiscardMargin: PlayerPolicy.appSafeDiscardMargin,
       ),
     );
 

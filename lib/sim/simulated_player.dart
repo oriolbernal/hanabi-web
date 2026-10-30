@@ -253,6 +253,46 @@ class PlayerView {
     return loss / total;
   }
 
+  /// Value of a joker's spare: what keeping it in reserve is worth, in
+  /// points, while a single lost card costs nothing thanks to it.
+  static const jokerReserve = 0.5;
+
+  /// Points lost if this card goes and so does the joker that could replace
+  /// it: the last copy of a needed card, which only the joker can stand in for.
+  final Map<int, int> _lossesWithoutJoker = {};
+
+  int _lossWithoutJoker(int n, CardColor c) => _lossesWithoutJoker.putIfAbsent(
+    _key(n, c),
+    () =>
+        _base -
+        game.maxScore(
+          lost: [
+            GameCard(n, c),
+            if (c != CardColor.joker) GameCard(n, CardColor.joker),
+          ],
+        ),
+  );
+
+  /// Like [expectedDiscardLoss], but discarding the last copy of a card that
+  /// a joker would have to replace also costs [jokerReserve]: it spends the
+  /// joker that was protecting every other card of that number. So a known
+  /// 3 with a spare copy is a safer discard than an unknown card that may be
+  /// the only blue 5.
+  double expectedDiscardRisk(int index) {
+    final w = weights(index);
+    final total = w.values.fold(0, (a, b) => a + b);
+    if (total == 0) return 0;
+    var risk = 0.0;
+    for (final MapEntry(key: (n, c), :value) in w.entries) {
+      final loss = _loss(n, c);
+      final spent = c == CardColor.joker
+          ? (_isDead(n, c) ? 0 : 1)
+          : _lossWithoutJoker(n, c) - loss;
+      risk += value * (loss + jokerReserve * spent);
+    }
+    return risk / total;
+  }
+
   bool surelyPlayable(int index) {
     final options = candidates(index);
     return options.isNotEmpty && options.every((o) => _canPlay(o.$1, o.$2));
