@@ -590,9 +590,11 @@ class _PileView extends StatelessWidget {
         ),
       );
     } else {
+      // A joker on top would hide which pile this is: frame it in its color.
       body = CardView(
         card: GameCard(card.number, card.color)..reveal(),
         width: width,
+        outline: card.isJoker ? base : null,
       );
     }
     return GestureDetector(
@@ -601,31 +603,38 @@ class _PileView extends StatelessWidget {
         children: [
           body,
           const SizedBox(height: 6),
-          if (wild)
-            SizedBox(
-              height: 4,
-              child: OverflowBox(
-                maxHeight: 14,
-                child: Text(
-                  tr.wild,
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1,
-                    color: textMuted,
-                    fontStyle: FontStyle.italic,
+          // The color bar always stays, so the pile is recognisable; a
+          // floating joker adds its label below without moving the layout.
+          SizedBox(
+            height: 4,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.topCenter,
+              children: [
+                Container(
+                  width: width * 0.5,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: base,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            )
-          else
-            Container(
-              width: width * 0.5,
-              height: 4,
-              decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                if (wild)
+                  Positioned(
+                    top: 6,
+                    child: Text(
+                      tr.wild,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1,
+                        color: textMuted,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
