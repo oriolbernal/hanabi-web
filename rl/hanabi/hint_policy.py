@@ -13,7 +13,9 @@ from .game import Game, PlayerView
 
 
 class HintPolicy:
-    def __init__(self, path: str | Path, play_first: bool = True) -> None:
+    # play_first was the app's rule for the PPO networks; the distilled network
+    # ships without it (it costs 0.4 points), so it is off by default.
+    def __init__(self, path: str | Path, play_first: bool = False) -> None:
         data = json.loads(Path(path).read_text())
         self.encode = ENCODERS[data.get("features", "v1")][0]
         self.layers = [(np.asarray(l["w"]), np.asarray(l["b"])) for l in data["layers"]]
