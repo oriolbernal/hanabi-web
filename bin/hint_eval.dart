@@ -2,7 +2,10 @@
 // same decks, reporting each one's gain over the expert's hint rules.
 //
 //   dart run bin/hint_eval.dart [games] [seed] [--player=human] [--search=rounds]
-//       [--model=path ...]
+//       [--model=path ...] [--playfirst]
+//
+// --playfirst runs the models as the app does: among hints that give the
+// player a likely play, only the best is allowed.
 
 // ignore_for_file: avoid_print
 
@@ -26,6 +29,7 @@ void main(List<String> args) {
         RlStrategy(
           jsonDecode(File(a.substring('--model='.length)).readAsStringSync()),
           name: File(a).uri.pathSegments.last.split('.').first,
+          playFirst: args.contains('--playfirst'),
         ),
     for (final a in args)
       if (a.startsWith('--search='))

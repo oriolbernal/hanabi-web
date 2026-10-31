@@ -53,6 +53,12 @@ def masked_mse(pred, target, masks):
     return (((pred - target) ** 2) * masks).sum() / masks.sum()
 
 
+def rounded(t: torch.Tensor) -> list:
+    """Six decimals keep the scores the same and the file a third of the size
+    (float32 values printed as doubles take 20 characters each)."""
+    return np.round(t.detach().double().numpy(), 6).tolist()
+
+
 def report(net, obs, masks, adv) -> str:
     """Error, and how many points per hint the network's pick loses against
     the search's pick, as the search itself estimated them."""
@@ -111,12 +117,13 @@ def main() -> None:
             "agent": "hints",
             "features": args.features,
             "layers": [
-                {"w": m.weight.detach().tolist(), "b": m.bias.detach().tolist()}
+                {"w": rounded(m.weight), "b": rounded(m.bias)}
                 for m in net
                 if isinstance(m, nn.Linear)
             ],
         },
         open(args.out, "w"),
+        separators=(",", ":"),
     )
     print("wrote", args.out)
 
