@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from hanabi.encoding import encode_v3, hint_to_action
+from hanabi.encoding import encode_v4, hint_to_action
 from hanabi.game import PLAYERS, Card, Game, apply_move, dummy_hint
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "parity.json"
@@ -32,7 +32,7 @@ def replay(deck, player):
             if hint is None:
                 game.discard(0)
                 continue
-            steps.append((encode_v3(game), hint_to_action(hint)))
+            steps.append((encode_v4(game), hint_to_action(hint)))
             game.hints -= 1
             game.apply_hint(hint)
         else:
@@ -50,7 +50,7 @@ def test_same_games_as_dart(games):
         assert (score, turns) == (expected["score"], expected["turns"]), f"seed {seed}"
 
 
-@pytest.mark.parametrize("features", ["v1", "v2", "v3"])
+@pytest.mark.parametrize("features", ["v1", "v2", "v3", "v4"])
 def test_observation_size_matches_space(features):
     from hanabi.env import HintEnv
 

@@ -129,8 +129,51 @@ def encode_v3(game: Game) -> np.ndarray:
     return np.concatenate([encode_v2(game), np.asarray(extra, np.float32)])
 
 
+NEXT_MOVE_FEATURES = 7
+OBSERVATION_SIZE_V4 = OBSERVATION_SIZE_V3 + ACTION_COUNT * NEXT_MOVE_FEATURES
+
+
+def encode_next_moves(game: Game) -> list[float]:
+    """Per hint (zeros when useless): the move the expert player makes right
+    after it (play, discard, hint asked), whether the played card fits,
+    whether the discard costs nothing, the points it costs (of 5), and the
+    best chance, from the player's view, of a card that really fits."""
+    from .game import PLAYERS
+
+    expert = PLAYERS["expert"]
+    useful = {hint_to_action(h) for h in game.useful_hints()}
+    fits = game.fireworks.playable_cards()
+    out: list[float] = []
+    for a in range(ACTION_COUNT):
+        if a not in useful:
+            out += [0.0] * NEXT_MOVE_FEATURES
+            continue
+        g = game.copy()
+        g.hints -= 1
+        g.apply_hint(action_to_hint(a))
+        kind, index = expert(g)
+        view = PlayerView(g)
+        chance = 0.0
+        for i, card in enumerate(g.hand):
+            if any(card.same_as(p) for p in fits):
+                chance = max(chance, view.play_probability(i))
+        if kind == "play":
+            out += [1, 0, 0, float(any(g.hand[index].same_as(p) for p in fits)), 0, 0, chance]
+        elif kind == "discard":
+            loss = g.discard_loss(g.hand[index])
+            out += [0, 1, 0, 0, float(loss == 0), loss / 5, chance]
+        else:
+            out += [0, 0, 1, 0, 0, 0, chance]
+    return out
+
+
+def encode_v4(game: Game) -> np.ndarray:
+    return np.concatenate([encode_v3(game), np.asarray(encode_next_moves(game), np.float32)])
+
+
 ENCODERS = {
     "v1": (encode, OBSERVATION_SIZE),
     "v2": (encode_v2, OBSERVATION_SIZE_V2),
     "v3": (encode_v3, OBSERVATION_SIZE_V3),
+    "v4": (encode_v4, OBSERVATION_SIZE_V4),
 }

@@ -2,7 +2,7 @@
 //
 //   dart run bin/export_parity.dart [games]
 //
-// For each seed: the dealt deck, and at every hint the (v3) observation the
+// For each seed: the dealt deck, and at every hint the (v4) observation the
 // policy would see and the hint the dummy strategy gave, plus final score.
 // Seeds rotate through the simulated player profiles.
 
@@ -27,7 +27,7 @@ class _Recorder extends HintStrategy {
     final hint = const DummyStrategy().choose(game);
     if (hint != null) {
       steps.add({
-        'obs': encodeObservationV3(game),
+        'obs': encodeObservationV4(game),
         'action': hintToAction(hint),
       });
     }
