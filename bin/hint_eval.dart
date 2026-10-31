@@ -23,6 +23,9 @@ void main(List<String> args) {
   final numbers = args.where((a) => !a.startsWith('--')).toList();
   final games = numbers.isNotEmpty ? int.parse(numbers[0]) : 2000;
   final seed = numbers.length > 1 ? int.parse(numbers[1]) : 20000;
+  final player = args.contains('--player=human')
+      ? ExpertPlayer.human
+      : ExpertPlayer.tuned;
   final strategies = <HintStrategy>[
     for (final a in args)
       if (a.startsWith('--model='))
@@ -31,13 +34,14 @@ void main(List<String> args) {
           name: File(a).uri.pathSegments.last.split('.').first,
           playFirst: args.contains('--playfirst'),
         ),
+    // The search simulates the same player it is evaluated with.
     for (final a in args)
       if (a.startsWith('--search='))
-        SearchHints(rounds: int.parse(a.substring('--search='.length))),
+        SearchHints(
+          search: HintSearch(player: player),
+          rounds: int.parse(a.substring('--search='.length)),
+        ),
   ];
-  final player = args.contains('--player=human')
-      ? ExpertPlayer.human
-      : ExpertPlayer.tuned;
 
   List<int> scores(HintStrategy s) => [
     for (var i = 0; i < games; i++) playGame(s, player, seed + i).score,

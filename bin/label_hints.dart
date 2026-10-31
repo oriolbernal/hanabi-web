@@ -3,7 +3,7 @@
 // asked, what the hint giver saw and the average score each hint led to.
 //
 //   dart run bin/label_hints.dart <from seed> <to seed> <rounds> <out.jsonl>
-//       [features=v4] [hints.json]
+//       [features=v4] [hints.json] [--player=human]
 //
 // One JSON object per line: "o" the observation, "m" the legal hints as
 // 11 bits, "v" the average final score after each hint (0 when illegal).
@@ -66,12 +66,18 @@ class _Recording extends HintStrategy {
   }
 }
 
-void main(List<String> args) {
+void main(List<String> rawArgs) {
+  // --player=human: the human-like player both plays the games and sits in
+  // the search's rollouts, so the labels say what helps a person.
+  final player = rawArgs.contains('--player=human')
+      ? ExpertPlayer.human
+      : ExpertPlayer.tuned;
+  final args = rawArgs.where((a) => !a.startsWith('--')).toList();
   final from = int.parse(args[0]), to = int.parse(args[1]);
   final out = File(args[3]).openSync(mode: FileMode.append);
   final features = args.length > 4 ? args[4] : 'v4';
   final hints = _Recording(
-    HintSearch(random: Random(from)),
+    HintSearch(random: Random(from), player: player),
     int.parse(args[2]),
     out,
     switch (features) {
@@ -87,7 +93,7 @@ void main(List<String> args) {
   var total = 0;
   for (var seed = from; seed < to; seed++) {
     final game = Game(random: Random(seed), strategy: hints);
-    playOut(game, ExpertPlayer.tuned);
+    playOut(game, player);
     total += game.score;
     if ((seed - from) % 50 == 49) {
       print('${seed - from + 1} games, ${hints.written} hints');
