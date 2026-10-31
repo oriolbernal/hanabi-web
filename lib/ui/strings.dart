@@ -46,6 +46,10 @@ abstract class Strings {
   String modeDescription(HintMode m);
   String get thinking;
 
+  /// Dev mode: copies the log of the person's moves to the clipboard.
+  String get copyLog;
+  String logCopied(int moves);
+
   // Game.
   String colorName(CardColor c);
 
@@ -102,6 +106,10 @@ class _English extends Strings {
 
   @override
   String get thinking => 'Thinking of the best hint…';
+  @override
+  String get copyLog => 'Copy move log';
+  @override
+  String logCopied(int moves) => 'Copied: $moves moves';
   @override
   String get subtitle => 'solitaire';
   @override
@@ -284,6 +292,10 @@ class _Catalan extends Strings {
 
   @override
   String get thinking => 'Pensant la millor pista…';
+  @override
+  String get copyLog => 'Copia el registre de jugades';
+  @override
+  String logCopied(int moves) => 'Copiat: $moves jugades';
   @override
   String get subtitle => 'solitari';
   @override
@@ -478,6 +490,10 @@ class _Spanish extends Strings {
 
   @override
   String get thinking => 'Pensando la mejor pista…';
+  @override
+  String get copyLog => 'Copiar el registro de jugadas';
+  @override
+  String logCopied(int moves) => 'Copiado: $moves jugadas';
   @override
   String get subtitle => 'solitario';
   @override

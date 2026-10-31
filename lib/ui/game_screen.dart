@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../game/card.dart';
 import '../game/game.dart';
@@ -8,6 +9,7 @@ import '../sim/simulated_player.dart';
 import 'advisor.dart';
 import 'card_view.dart';
 import 'hint_mode.dart';
+import 'move_log.dart';
 import 'palette.dart';
 import 'settings.dart';
 import 'strings.dart';
@@ -90,6 +92,7 @@ class _GameScreenState extends State<GameScreen> {
       target = await _askTarget();
       if (target == null) return;
     }
+    _log(PlayMove(index));
     final result = _game.play(index, target: target);
     setState(() {
       _selected = null;
@@ -105,6 +108,7 @@ class _GameScreenState extends State<GameScreen> {
   void _discard() {
     final index = _selected;
     if (index == null) return;
+    _log(DiscardMove(index));
     final card = _game.discard(index);
     setState(() {
       _selected = null;
@@ -115,10 +119,28 @@ class _GameScreenState extends State<GameScreen> {
     _checkEnd();
   }
 
+  /// Dev mode: keeps the move, and the advice if it was showing, for
+  /// [MoveLog].
+  void _log(Move move) {
+    if (!Settings.devMode.value) return;
+    MoveLog.record(
+      _game,
+      move,
+      advice: _adviceMoves == _moves ? _advice?.move : null,
+      mode: widget.mode.name,
+    );
+  }
+
+  Future<void> _copyLog() async {
+    await Clipboard.setData(ClipboardData(text: await MoveLog.export()));
+    if (mounted) _toast(tr.logCopied(await MoveLog.length));
+  }
+
   /// While the search hint giver is thinking: no other move meanwhile.
   bool _thinking = false;
 
   Future<void> _hint() async {
+    if (_game.hints > 0 && _game.usefulHints.isNotEmpty) _log(HintMove());
     final Hint? picked;
     if (widget.strategy case final SearchHints search) {
       if (_game.usefulHints.isEmpty) {
@@ -274,6 +296,12 @@ class _GameScreenState extends State<GameScreen> {
               ),
               color: _showAdvice ? accent : null,
               onPressed: () => setState(() => _showAdvice = !_showAdvice),
+            ),
+          if (Settings.devMode.value)
+            IconButton(
+              tooltip: tr.copyLog,
+              icon: const Icon(Icons.copy_all),
+              onPressed: _copyLog,
             ),
           IconButton(
             tooltip: tr.newGame,
