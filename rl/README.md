@@ -187,5 +187,9 @@ distilled network lost half a point to the Expert hint rules; with them:
 | D3 | 189k | 20.18 | 19.96 |
 | **D4** (in the app, no play-first rule) | 283k | **20.43** | **20.13** |
 
+The player agent PB, trained with the HA hints, drops to 16.5 with D4 (the
+Expert rules make 20.3 and the human-like ones 20.0, 2,000 games), so the app's
+dev-mode advisor now follows the Expert rules instead of the agent.
+
 Doubling the data is still worth ~0.2 points. A 512×512 network does not
 beat 256×256; rounding weights to six decimals changes nothing (1.3 MB).

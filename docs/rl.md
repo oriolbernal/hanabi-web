@@ -342,6 +342,10 @@ Resultat en 2.000 partides de test noves (pistes de les regles *Expert*:
   costa 0,4 punts a la nova: s'ha tret.
 - Una xarxa 512×512 no millora la 256×256; arrodonir els pesos a sis decimals
   tampoc canvia res i deixa el model en 1,3 MB.
+- **L'agent jugador (5.6) no sobreviu al canvi de pistes:** amb D4 fa 16,5
+  punts (amb les pistes antigues, 20,2), mentre que les regles Expert en fan
+  20,3. L'assistent del mode dev segueix ara les regles Expert, les mateixes
+  per a les quals la cerca i la xarxa trien les pistes.
 - **Per què PPO va per sota:** el senyal és petit (la cerca guanya ~0,05 punts
   per pista a les regles) i el soroll d'una partida és de ~3 punts. La cerca
   fa la mitjana de 32 partides per pista abans d'ensenyar res; PPO ho ha

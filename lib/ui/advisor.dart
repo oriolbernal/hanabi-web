@@ -10,7 +10,9 @@ import '../sim/simulated_player.dart';
 import 'palette.dart';
 import 'strings.dart';
 
-/// The trained player agent, loaded once from the app's assets.
+/// The trained player agent. The app no longer advises with it: it was
+/// trained with the previous hint network and scores 16.5 with the current
+/// one, against 20.3 for ExpertPlayer.tuned. Kept for the Dart tools.
 final Future<PlayerPolicy> loadAdvisor = rootBundle
     .loadString('assets/models/player_policy.json')
     .then(

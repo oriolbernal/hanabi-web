@@ -54,15 +54,11 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    // The search picks hints expecting the expert's way of playing, and the
-    // trained agent plays badly with them (17 instead of 21.5 points).
-    if (widget.strategy is SearchHints) {
-      _advisor = ExpertPlayer.tuned;
-      return;
-    }
-    loadAdvisor.then((a) {
-      if (mounted) setState(() => _advisor = a);
-    });
+    // The search, and the network distilled from it, pick hints expecting
+    // the expert's way of playing; the trained agent plays badly with them
+    // (16.5 points against the expert's 20.3), so the advice follows the
+    // same explicit rules the hints were made for.
+    _advisor = ExpertPlayer.tuned;
   }
 
   /// Cards revealed by the last hint, highlighted until the next move.
