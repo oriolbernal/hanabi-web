@@ -193,3 +193,26 @@ dev-mode advisor now follows the Expert rules instead of the agent.
 
 Doubling the data is still worth ~0.2 points. A 512×512 network does not
 beat 256×256; rounding weights to six decimals changes nothing (1.3 MB).
+
+## The human-like player, fitted to the app's move log
+
+`analyze_moves.py` rebuilds every state the app logged (dev mode, copy icon)
+and compares the person's move with the simulated players'. Three games, 284
+decisions: the person hints whenever a hint is left and discards only at zero,
+plays uncertain cards from p ≥ 0.7 (13 of 13 fit; all five below 0.5 failed),
+discards the oldest untouched card or a hinted card that no longer matters,
+and never plays a joker whose number is unknown even when it fits every pile.
+A grid search over the ExpertPlayer settings gives `human` = threshold 0.7,
+reserve 1, chop discards, `joker_needs_number`:
+
+| simulated player | same move as the person |
+|---|---|
+| Expert | 45% |
+| old human (reserve 8, p ≥ 0.5) | 52% |
+| **human** | **74%** |
+
+Against this player the Expert hint rules score 17.92 and **D4 drops to 17.31**
+(it was distilled from a search that simulated the Expert), while the search
+simulating the human player makes 20.70 (100 games, +3.10). The next batches
+(`label_hints ... --player=human`) put the human player both in the games and
+inside the search rollouts.

@@ -351,6 +351,41 @@ Resultat en 2.000 partides de test noves (pistes de les regles *Expert*:
   fa la mitjana de 32 partides per pista abans d'ensenyar res; PPO ho ha
   d'aprendre partida a partida.
 
+### 5.11 Com jugues tu: el jugador humà, ajustat amb el registre de jugades
+
+Tot el d'abans es mesura contra jugadors simulats. Amb el registre de jugades
+de l'app (mode dev, icona de copiar) i `rl/analyze_moves.py` vam mirar què fas
+de debò en tres partides (19, 20 i 16 punts, 284 decisions):
+
+- **Demanes pista sempre que en queda alguna** (52 pistes contra 10 descarts
+  amb una sola pista; 51 descarts, tots amb zero). El jugador Expert en
+  reservava 8 i descartava abans: això sol no s'assembla gens a tu.
+- **Jugues cartes incertes quan la probabilitat passa de 0,7** (13 jugades,
+  les 13 encaixen). Les cinc jugades per sota de 0,5 van fallar totes.
+- **Descartes la carta més vella sense pistes** (40 vegades), o una carta amb
+  pista que ja no serveix (33), o una d'inútil segur (15).
+- **No jugues un comodí del qual només saps el color:** les 25 "jugades
+  segures" que no vas fer eren el mateix comodí, que segons el càlcul encaixa
+  a alguna pila sigui quin sigui el seu número. Ningú fa aquest càlcul de cap.
+
+Amb una cerca de paràmetres sobre el registre, el jugador *humà* passa a: juga
+amb p ≥ 0,7, reserva 1 pista, descarta la carta més vella i vol saber el
+número d'un comodí abans de jugar-lo. Coincidència amb les teves jugades:
+
+| jugador simulat | mateixa jugada que tu |
+|---|---|
+| Expert (regles de l'assistent) | 45% |
+| humà antic (reserva 8, p ≥ 0,5) | 52% |
+| **humà nou** | **74%** |
+
+Aquest jugador fa menys punts que l'Expert (les pistes de les regles: 17,9
+contra 19,4), i **D4 hi perd**: 17,31 contra 17,92 de les regles, perquè va
+aprendre d'una cerca que simulava l'Expert. En canvi la cerca que simula el
+jugador humà hi arriba a **20,7** (100 partides, +3,1 sobre les regles): hi ha
+tres punts per destil·lar. La fornada següent de dades (`--player=human` a
+`label_hints`) posa el jugador humà a les partides i dins la cerca; el
+resultat (H1) s'afegirà aquí.
+
 ## 6. Lliçons
 
 1. **Mesurar abans de canviar.** Cada salt gran ha vingut d'una mesura que ens
@@ -399,6 +434,10 @@ uv run python eval_player.py models/PB.zip --games 4000 --hints ../assets/models
 uv run python distill.py --data 'data/v4_*.jsonl' --out models/D.json --features v4
 (cd .. && dart run bin/hint_eval.dart 2000 20000 --model=rl/models/D.json --player=human)
 # fornades següents: afegiu el model com a últim argument de label_hints perquè condueixi les partides
+# ... i --player=human perquè el jugador humà jugui les partides i les simulacions de la cerca
+
+# Què fas tu: enganxeu el registre de jugades de l'app (mode dev) a data/moves.jsonl
+uv run python analyze_moves.py data/moves.jsonl
 
 uv run tensorboard --logdir runs                # corbes en directe
 uv run python plots.py                          # gràfiques d'aquest document
