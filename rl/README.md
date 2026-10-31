@@ -23,6 +23,9 @@ Dart rules ──export_parity.dart──▶ fixtures ──pytest──▶ Pyth
 - `train.py` – MaskablePPO (invalid hints are masked out), evaluates on 500
   fixed games every 50k steps and keeps the best model.
 - `export.py` – writes the actor network as JSON for Dart.
+- `distill.py` – trains the hint network to predict the value of every hint
+  as measured by the search (`bin/label_hints.dart` writes the data). This
+  is what the app ships now; see "Distilling the search" below.
 
 ## Run
 
@@ -36,6 +39,14 @@ uv run tensorboard --logdir runs              # learning curves
 uv run python export.py models/H_v3.zip
 (cd .. && dart run bin/players.dart 3000)        # every strategy × player
 (cd .. && dart run bin/benchmark.dart 10000 --fast)
+```
+
+Distillation (the model in the app):
+
+```sh
+(cd .. && dart run bin/label_hints.dart 200000 200400 32 rl/data/v4_0.jsonl v4)  # one of several in parallel
+uv run python distill.py --data 'data/v4_*.jsonl' --out models/D.json --features v4
+(cd .. && dart run bin/hint_eval.dart 2000 20000 --model=rl/models/D.json)
 ```
 
 If you change the rules, the simulated player or the observation in Dart,
@@ -156,3 +167,25 @@ Alternating round (4,000 fresh test games): hints fine-tuned against a mix
 with the agent (HA) and a second player seed (PB) give **20.16** (HA + PB,
 now in the app), against 19.02 for the best rule-based player. Two seeds of
 the same player training ended ~0.6 points apart (P4 vs PB).
+
+## Distilling the search
+
+The search hint mode (32 rollouts per hint, same cards for every hint) scores
+21.5 but is slow. Instead of PPO, the network now learns to predict the value
+the search measured for each hint (value regression, targets centered per
+state), on games driven by the previous network (DAgger). Features **v4** add,
+per hint, what the Expert rule player does right after it (play, discard,
+ask; whether the play fits, whether the discard is free). Without them the
+distilled network lost half a point to the Expert hint rules; with them:
+
+| hints (2,000 fresh test games) | data | Expert player | human-like player |
+|---|---|---|---|
+| Expert hint rules | | 19.35 | 19.30 |
+| HA + play-first rule (previous app model) | | 18.12 | |
+| E3: PPO against Expert, v4, 3M steps | | 19.85 | 19.63 |
+| D2: distilled, v4 | 95k hints | 19.99 | 19.75 |
+| D3 | 189k | 20.18 | 19.96 |
+| **D4** (in the app, no play-first rule) | 283k | **20.43** | **20.13** |
+
+Doubling the data is still worth ~0.2 points. A 512×512 network does not
+beat 256×256; rounding weights to six decimals changes nothing (1.3 MB).

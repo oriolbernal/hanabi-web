@@ -30,7 +30,7 @@ enum HintMode {
       .then(
         (json) => RlStrategy(
           jsonDecode(json) as Map<String, dynamic>,
-          playFirst: true,
+          playFirst: false,
         ),
       );
 }

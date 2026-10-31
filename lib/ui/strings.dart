@@ -137,7 +137,8 @@ class _English extends Strings {
   String modeDescription(HintMode m) => switch (m) {
     HintMode.classic => 'The original rule: reveals what most cards share.',
     HintMode.smart => 'Tries every hint and picks the one that helps most.',
-    HintMode.ai => 'A neural network trained on thousands of simulated games.',
+    HintMode.ai =>
+      'A neural network that learned from the search over thousands of games.',
     HintMode.search =>
       'Plays out every hint many times and gives the best one.',
   };
@@ -326,7 +327,7 @@ class _Catalan extends Strings {
       'La regla original: revela el que tenen en comú més cartes.',
     HintMode.smart => 'Prova totes les pistes i tria la que més ajuda.',
     HintMode.ai =>
-      'Una xarxa neuronal entrenada amb milers de partides simulades.',
+      'Una xarxa neuronal que ha après de la cerca en milers de partides.',
     HintMode.search => 'Juga cada pista moltes vegades i et dona la millor.',
   };
 
@@ -524,7 +525,7 @@ class _Spanish extends Strings {
       'La regla original: revela lo que comparten más cartas.',
     HintMode.smart => 'Prueba todas las pistas y elige la que más ayuda.',
     HintMode.ai =>
-      'Una red neuronal entrenada con miles de partidas simuladas.',
+      'Una red neuronal que ha aprendido de la búsqueda en miles de partidas.',
     HintMode.search => 'Juega cada pista muchas veces y te da la mejor.',
   };
 

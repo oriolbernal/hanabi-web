@@ -15,7 +15,9 @@ TensorBoard (`rl/runs/`) i es regeneren amb `cd rl && uv run python plots.py`.
 | IA de pistes, amb "efecte de cada pista" (v2) | 16,6 |
 | ... amb jugadors que arrisquen i valoren els comodins | ~18,6 |
 | ... amb un agent jugador entrenat amb RL | 19,6 |
-| **... entrenant pistes i jugador l'un per a l'altre** | **20,2** |
+| ... entrenant pistes i jugador l'un per a l'altre | 20,2 |
+| **IA de pistes destil·lada de la cerca (D4), amb el jugador de regles Expert** | **20,4** |
+| Cerca en viu (mode "Cerca", lent) | 21,5 |
 | Sostre: un jugador que veu les seves cartes | 23,9 |
 
 Les dues primeres xifres i les de la IA de pistes són contra el jugador simulat
@@ -300,6 +302,51 @@ conegut i jugable, que també té risc 0. Ara només canvia a cartes que segur q
 no es poden jugar, i també baixen les partides perdudes per vides (del 23% al
 16%).
 
+### 5.10 Tornar a començar: destil·lar la cerca
+
+Les pistes de l'app no agradaven, i cada reentrenament amb PPO donava dècimes.
+Vam replantejar el problema des de zero:
+
+1. **Un jugador fix i llegible.** El jugador *Expert* són set regles
+   (jugar segur, descartar inútil, jugar amb probabilitat ≥ 0,5, guardar
+   pistes...) i una variant *humana* que descarta la carta més vella quan no
+   en sap res. Tot s'avalua contra aquests jugadors, mai xarxa contra xarxa, i
+   l'app registra les teves jugades (mode dev) per ajustar-los.
+2. **La cerca com a mestre.** El mode "Cerca" juga cada pista possible 32
+   vegades amb les mateixes cartes i tria la millor (21,5 punts), però és
+   lenta. En lloc d'aprendre per prova i error, la xarxa **imita la cerca**:
+   per a cada estat es guarda el valor de cada pista i la xarxa aprèn a
+   predir-lo (regressió del valor, no classificació de la millor pista).
+3. **Característiques v4.** A més de l'efecte de cada pista (v2) i les pèrdues
+   per descart (v3), la xarxa veu **què farà el jugador just després de cada
+   pista**: si jugarà, descartarà o demanarà pista, si la jugada encaixa, si el
+   descart és gratuït. Amb v3 la destil·lació perdia mig punt respecte a les
+   regles (D1: 18,85); amb v4 en guanya (D2: 19,99).
+4. **Més dades, conduïdes per la xarxa.** Cada fornada de 2.400 partides la
+   juga la xarxa anterior i la cerca etiqueta les pistes (DAgger): així la
+   xarxa aprèn dels estats que ella mateixa visita.
+
+Resultat en 2.000 partides de test noves (pistes de les regles *Expert*:
+19,35 amb el jugador Expert, 19,30 amb l'humà; marge ±0,13):
+
+| pistes | dades | jugador Expert | jugador humà |
+|---|---|---|---|
+| xarxa anterior (HA) amb la regla "primer jugar" | | 18,12 | |
+| E3: PPO contra l'Expert, v4, 3M passos | | 19,85 | 19,63 |
+| D2: destil·lada, v4 | 95.000 pistes | 19,99 | 19,75 |
+| D3 | 189.000 | 20,18 | 19,96 |
+| **D4** ← a l'app | 283.000 | **20,43** | **20,13** |
+
+- Doblar les dades val uns 0,2 punts cada vegada i encara no s'ha aturat.
+- La regla "primer les pistes de jugar" (5.3), que salvava la xarxa vella,
+  costa 0,4 punts a la nova: s'ha tret.
+- Una xarxa 512×512 no millora la 256×256; arrodonir els pesos a sis decimals
+  tampoc canvia res i deixa el model en 1,3 MB.
+- **Per què PPO va per sota:** el senyal és petit (la cerca guanya ~0,05 punts
+  per pista a les regles) i el soroll d'una partida és de ~3 punts. La cerca
+  fa la mitjana de 32 partides per pista abans d'ensenyar res; PPO ho ha
+  d'aprendre partida a partida.
+
 ## 6. Lliçons
 
 1. **Mesurar abans de canviar.** Cada salt gran ha vingut d'una mesura que ens
@@ -315,6 +362,9 @@ no es poden jugar, i també baixen les partides perdudes per vides (del 23% al
    de test noves i diverses llavors abans de concloure.
 7. **Simulador ≠ realitat**: tot es mesura contra jugadors simulats. El que
    importa és com jugues tu, i això només es tanca amb dades reals.
+8. **Si tens un mestre lent, imita'l.** Quan el senyal és petit respecte al
+   soroll, destil·lar una cerca que fa mitjanes (D2-D4) ha batut PPO, que
+   aprèn partida a partida. I avalua sempre contra un jugador fix i llegible.
 
 ## 7. Com reproduir-ho
 
@@ -338,6 +388,13 @@ uv run python -u train.py --name HA --features v3 \
 uv run python export.py models/HA.zip ../assets/models/hint_policy.json
 
 uv run python eval_player.py models/PB.zip --games 4000 --hints ../assets/models/hint_policy.json
+
+# IA de pistes destil·lada de la cerca (la de l'app): etiquetar, entrenar, avaluar
+(cd .. && dart compile exe bin/label_hints.dart -o /tmp/label_hints && \
+  for i in 0 1 2 3 4 5; do /tmp/label_hints $((200000+i*400)) $((200400+i*400)) 32 rl/data/v4_$i.jsonl v4 & done; wait)
+uv run python distill.py --data 'data/v4_*.jsonl' --out models/D.json --features v4
+(cd .. && dart run bin/hint_eval.dart 2000 20000 --model=rl/models/D.json --player=human)
+# fornades següents: afegiu el model com a últim argument de label_hints perquè condueixi les partides
 
 uv run tensorboard --logdir runs                # corbes en directe
 uv run python plots.py                          # gràfiques d'aquest document

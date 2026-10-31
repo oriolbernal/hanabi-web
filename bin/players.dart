@@ -30,8 +30,8 @@ void main(List<String> args) {
         jsonDecode(File(path).readAsStringSync()),
         name: models.length > 1
             ? File(path).uri.pathSegments.last.split('.').first
-            : 'rl+rule',
-        playFirst: true,
+            : 'rl',
+        playFirst: false,
       ),
   ];
 
