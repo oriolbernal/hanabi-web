@@ -525,6 +525,9 @@ class ExpertPlayer:
     reserve: int = 0
     low_risk: float = 0.0
     chop_discards: bool = False
+    # People do not work out that a joker of unknown number fits some pile
+    # whatever it is; they wait for the number.
+    joker_needs_number: bool = False
 
     def __call__(self, game: Game) -> Move:
         view = PlayerView(game)
@@ -533,6 +536,11 @@ class ExpertPlayer:
         sure = None
         for i in range(n):
             if not view.surely_playable(i) or wastes_joker(game, i):
+                continue
+            card = game.hand[i]
+            if self.joker_needs_number and not card.known_number and (
+                not card.known_color or card.is_joker
+            ):
                 continue
             if sure is None or self._lowest(game, i) < self._lowest(game, sure):
                 sure = i
@@ -595,7 +603,9 @@ PLAYERS = {
     "balanced": RiskTakingPlayer("balanced", 0.75, 0.95, 0.9),
     "bold": RiskTakingPlayer("bold", 0.6, 0.85, 0.85),
     "expert": ExpertPlayer("expert", 0.5, 0.3, 8, 0.15),
-    "human": ExpertPlayer("human", 0.5, 0.3, 8, 0.15, chop_discards=True),
+    # Fitted to the move log of 3 games (73% of the moves match; see
+    # analyze_moves.py): hints whenever one is left, plays at 0.7, chop.
+    "human": ExpertPlayer("human", 0.7, 0.3, 1, 0.15, chop_discards=True, joker_needs_number=True),
 }
 
 

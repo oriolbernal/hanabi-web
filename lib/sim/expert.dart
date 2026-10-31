@@ -151,22 +151,29 @@ class ExpertPlayer extends SimulatedPlayer {
     this.reserve = 0,
     this.lowRisk = 0,
     this.chopDiscards = false,
+    this.jokerNeedsNumber = false,
     this.name = 'expert',
   });
+
+  /// People do not work out that a joker of unknown number fits some pile
+  /// whatever its number is; they wait until they know the number.
+  final bool jokerNeedsNumber;
 
   /// Discards the way people do: the oldest card no hint has touched (the
   /// "chop"), instead of the card with the lowest expected cost. Only when
   /// every card has been touched does the expected cost decide.
   final bool chopDiscards;
 
-  /// A stand-in for a person until the move log says otherwise: the tuned
-  /// settings with chop discards.
+  /// Fitted to the app's move log (rl/analyze_moves.py, 3 games, 73% of
+  /// the moves match): asks for a hint whenever one is left, plays a card
+  /// at 70% or more, discards the chop, and waits for a joker's number.
   static const human = ExpertPlayer(
-    playThreshold: 0.5,
+    playThreshold: 0.7,
     hintedPenalty: 0.3,
-    reserve: 8,
+    reserve: 1,
     lowRisk: 0.15,
     chopDiscards: true,
+    jokerNeedsNumber: true,
     name: 'human',
   );
 
@@ -204,6 +211,12 @@ class ExpertPlayer extends SimulatedPlayer {
     int? sure;
     for (var i = 0; i < n; i++) {
       if (!view.surelyPlayable(i) || wastesJoker(game, i)) continue;
+      final card = game.hand[i];
+      if (jokerNeedsNumber &&
+          !card.knownNumber &&
+          (!card.knownColor || card.color == CardColor.joker)) {
+        continue;
+      }
       if (sure == null || _lowest(game, i) < _lowest(game, sure)) sure = i;
     }
     if (sure != null) {
