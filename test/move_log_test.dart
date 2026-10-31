@@ -5,8 +5,20 @@ import 'package:hanabi/game/card.dart';
 import 'package:hanabi/game/game.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 import 'package:hanabi/ui/move_log.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('the state is kept as it was before the move, not after', () async {
+    SharedPreferences.setMockInitialValues({});
+    final game = Game(random: Random(5), strategy: const DummyStrategy());
+    final future = MoveLog.record(game, DiscardMove(0), mode: 'ai');
+    game.discard(0); // The screen moves on without waiting for the log.
+    await future;
+    final line = (await MoveLog.export()).split('\n').last;
+    expect(line, contains('"hints":10'));
+    expect(line, contains('"discarded":[]'));
+  });
+
   test('a move is encoded with what the person saw', () {
     final game = Game(random: Random(3), strategy: const DummyStrategy());
     game.hint();

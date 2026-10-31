@@ -385,6 +385,44 @@ class PlayerView:
         loss = sum(v * self._loss(n, c) for (n, c), v in w.items())
         return loss / total
 
+    # Port of expectedDiscardRisk: losing the last copy of a needed card also
+    # spends the joker that protected every card of that number.
+    JOKER_RESERVE = 0.5
+
+    def _gone(self, n: int, c: int) -> int:
+        return sum(1 for d in self.game.discarded if d.number == n and d.color == c)
+
+    def _has_spare(self, n: int, c: int) -> bool:
+        return c != JOKER and copies(n, c) - self._gone(n, c) >= 2
+
+    def _loss_without_joker(self, n: int, c: int) -> int:
+        cache = self.__dict__.setdefault("_loss_without_joker_cache", {})
+        if (n, c) not in cache:
+            base = self.game.max_score()
+            if self._is_dead(n, c):
+                cache[(n, c)] = 0
+            elif self._has_spare(n, c):
+                cache[(n, c)] = base - self.game.max_score((Card(n, JOKER),))
+            else:
+                lost = (Card(n, c),) if c == JOKER else (Card(n, c), Card(n, JOKER))
+                cache[(n, c)] = base - self.game.max_score(lost)
+        return cache[(n, c)]
+
+    def expected_discard_risk(self, index: int) -> float:
+        w = self.weights(index)
+        total = sum(w.values())
+        if total == 0:
+            return 0.0
+        risk = 0.0
+        for (n, c), v in w.items():
+            loss = self._loss(n, c)
+            if c == JOKER:
+                spent = 0 if self._is_dead(n, c) else 1
+            else:
+                spent = self._loss_without_joker(n, c) - loss
+            risk += v * (loss + self.JOKER_RESERVE * spent)
+        return risk / total
+
     def _can_play(self, number: int, color: int) -> bool:
         f = self.game.fireworks
         probe = Card(number, color)
@@ -475,12 +513,89 @@ class RiskTakingPlayer:
         return ("discard", safest)
 
 
-# Same order and settings as playerProfiles in Dart.
+@dataclass(frozen=True)
+class ExpertPlayer:
+    """Port of ExpertPlayer in lib/sim/expert.dart: explicit rules a person
+    can follow. With chop_discards it throws away the oldest untouched card,
+    as people do, instead of the one with the lowest expected cost."""
+
+    name: str
+    play_threshold: float = 0.8
+    hinted_penalty: float = 0.3
+    reserve: int = 0
+    low_risk: float = 0.0
+    chop_discards: bool = False
+
+    def __call__(self, game: Game) -> Move:
+        view = PlayerView(game)
+        n = len(game.hand)
+
+        sure = None
+        for i in range(n):
+            if not view.surely_playable(i) or wastes_joker(game, i):
+                continue
+            if sure is None or self._lowest(game, i) < self._lowest(game, sure):
+                sure = i
+        if sure is not None:
+            return ("play", sure)
+
+        if game.hints < MAX_HINTS:
+            for i in range(n):
+                if view.surely_useless(i):
+                    return ("discard", i)
+
+        best, best_p = -1, 0.0
+        for i in range(n):
+            if wastes_joker(game, i):
+                continue
+            p = view.play_probability(i)
+            if p > best_p:
+                best, best_p = i, p
+
+        if game.errors > 1 and best >= 0 and best_p >= self.play_threshold:
+            return ("play", best)
+
+        pick, pick_risk = self._safest_discard(game, view)
+
+        if game.hints < self.reserve and game.hints < MAX_HINTS and pick_risk <= self.low_risk:
+            return ("discard", pick)
+
+        if game.hints > 0 and game.useful_hints():
+            return ("hint", -1)
+
+        if not game.deck and best >= 0:
+            return ("play", best)
+
+        return ("discard", pick)
+
+    def _safest_discard(self, game: Game, view: PlayerView) -> tuple[int, float]:
+        if self.chop_discards:
+            for i, card in enumerate(game.hand):
+                if not card.known_number and not card.known_color:
+                    return i, view.expected_discard_risk(i)
+        pick, pick_cost, pick_risk = 0, float("inf"), 0.0
+        for i, card in enumerate(game.hand):
+            risk = view.expected_discard_risk(i)
+            hinted = card.known_number or card.known_color
+            cost = risk + (self.hinted_penalty if hinted else 0)
+            if cost < pick_cost:
+                pick, pick_cost, pick_risk = i, cost, risk
+        return pick, pick_risk
+
+    @staticmethod
+    def _lowest(game: Game, i: int) -> int:
+        c = game.hand[i]
+        return c.number if c.known_number else 6
+
+
+# Same order and settings as playerProfiles in Dart, then the experts.
 PLAYERS = {
     "careful": careful_move,
     "cautious": RiskTakingPlayer("cautious", 0.9, 1.0, 1.0),
     "balanced": RiskTakingPlayer("balanced", 0.75, 0.95, 0.9),
     "bold": RiskTakingPlayer("bold", 0.6, 0.85, 0.85),
+    "expert": ExpertPlayer("expert", 0.5, 0.3, 8, 0.15),
+    "human": ExpertPlayer("human", 0.5, 0.3, 8, 0.15, chop_discards=True),
 }
 
 

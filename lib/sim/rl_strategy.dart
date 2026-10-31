@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../game/card.dart';
 import '../game/game.dart';
+import 'expert.dart';
 import 'mlp.dart';
 import 'simulated_player.dart';
 import 'smart_strategies.dart';
@@ -89,6 +90,63 @@ List<double> encodeObservationV3(Game game) => encodeObservationV2(game)
   ])
   ..add(game.maxScore() / 25);
 
+/// Feature set v4 appends, per hint, what the expert player would do right
+/// after it (see [encodeNextMoves]).
+const nextMoveFeatures = 7;
+const observationSizeV4 = observationSizeV3 + actionCount * nextMoveFeatures;
+
+/// v3 plus [encodeNextMoves].
+List<double> encodeObservationV4(Game game) =>
+    encodeObservationV3(game)..addAll(encodeNextMoves(game));
+
+/// For each of the [actionCount] hints (all zero when it would reveal
+/// nothing), the move [ExpertPlayer.tuned] makes right after it and how it
+/// turns out: play, discard or hint asked (one-hot); the played card fits;
+/// the discarded card costs nothing; the points the discard costs (of 5);
+/// and the best chance, from the player's view, of a card that really fits.
+List<double> encodeNextMoves(Game game) {
+  final useful = {for (final h in game.usefulHints) hintToAction(h)};
+  final fits = game.fireworks.playableCards();
+  final out = <double>[];
+  for (var a = 0; a < actionCount; a++) {
+    if (!useful.contains(a)) {
+      out.addAll(List.filled(nextMoveFeatures, 0));
+      continue;
+    }
+    final g = Game.copy(game)..giveHint(actionToHint(a));
+    final move = ExpertPlayer.tuned.decide(g);
+    final view = PlayerView(g);
+    var chance = 0.0;
+    for (var i = 0; i < g.hand.length; i++) {
+      if (fits.any(g.hand[i].sameAs)) {
+        chance = max(chance, view.playProbability(i));
+      }
+    }
+    out.addAll(switch (move) {
+      PlayMove(:final index) => [
+        1,
+        0,
+        0,
+        fits.any(g.hand[index].sameAs) ? 1 : 0,
+        0,
+        0,
+        chance,
+      ],
+      DiscardMove(:final index) => [
+        0,
+        1,
+        0,
+        0,
+        g.discardLoss(g.hand[index]) == 0 ? 1 : 0,
+        g.discardLoss(g.hand[index]) / 5,
+        chance,
+      ],
+      HintMove() => [0, 0, 1, 0, 0, 0, chance],
+    });
+  }
+  return out;
+}
+
 /// For each of the [actionCount] hints, [actionFeatures] numbers describing
 /// its effect (all zero when the hint would reveal nothing):
 /// change in surely playable cards, change in surely useless cards, cards
@@ -143,6 +201,7 @@ class RlStrategy extends HintStrategy {
          'v1' => encodeObservation,
          'v2' => encodeObservationV2,
          'v3' => encodeObservationV3,
+         'v4' => encodeObservationV4,
          final f => throw ArgumentError('unknown feature set $f'),
        },
        _net = Mlp(weights);

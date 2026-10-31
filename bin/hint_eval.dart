@@ -1,7 +1,8 @@
 // Compares hint givers with the expert player in the player's seat, on the
 // same decks, reporting each one's gain over the expert's hint rules.
 //
-//   dart run bin/hint_eval.dart [games] [seed] [--search=rounds] [--model=path ...]
+//   dart run bin/hint_eval.dart [games] [seed] [--player=human] [--search=rounds]
+//       [--model=path ...]
 
 // ignore_for_file: avoid_print
 
@@ -30,14 +31,16 @@ void main(List<String> args) {
       if (a.startsWith('--search='))
         SearchHints(rounds: int.parse(a.substring('--search='.length))),
   ];
-  const player = ExpertPlayer.tuned;
+  final player = args.contains('--player=human')
+      ? ExpertPlayer.human
+      : ExpertPlayer.tuned;
 
   List<int> scores(HintStrategy s) => [
     for (var i = 0; i < games; i++) playGame(s, player, seed + i).score,
   ];
   final base = scores(const ExpertHints());
   final baseMean = base.reduce((a, b) => a + b) / games;
-  print('expert player, $games games from seed $seed\n');
+  print('${player.name} player, $games games from seed $seed\n');
   print('hints         mean   gain  ±95%   time');
   print('${'expert'.padRight(12)} ${baseMean.toStringAsFixed(2).padLeft(6)}');
   for (final s in strategies) {

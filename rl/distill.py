@@ -75,6 +75,7 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-5)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--features", default="v4", help="the feature set the data was written with")
     args = p.parse_args()
     torch.manual_seed(args.seed)
 
@@ -108,7 +109,7 @@ def main() -> None:
     json.dump(
         {
             "agent": "hints",
-            "features": "v3",
+            "features": args.features,
             "layers": [
                 {"w": m.weight.detach().tolist(), "b": m.bias.detach().tolist()}
                 for m in net

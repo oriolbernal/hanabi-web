@@ -150,8 +150,25 @@ class ExpertPlayer extends SimulatedPlayer {
     this.hintedPenalty = 0.3,
     this.reserve = 0,
     this.lowRisk = 0,
+    this.chopDiscards = false,
     this.name = 'expert',
   });
+
+  /// Discards the way people do: the oldest card no hint has touched (the
+  /// "chop"), instead of the card with the lowest expected cost. Only when
+  /// every card has been touched does the expected cost decide.
+  final bool chopDiscards;
+
+  /// A stand-in for a person until the move log says otherwise: the tuned
+  /// settings with chop discards.
+  static const human = ExpertPlayer(
+    playThreshold: 0.5,
+    hintedPenalty: 0.3,
+    reserve: 8,
+    lowRisk: 0.15,
+    chopDiscards: true,
+    name: 'human',
+  );
 
   /// Below this many hint tokens, a discard of at most [lowRisk] expected
   /// points comes before asking for a hint: running out of hints forces
@@ -258,6 +275,14 @@ class ExpertPlayer extends SimulatedPlayer {
 
   /// The card least likely to cost points, and its expected cost.
   (int, double) _safestDiscard(Game game, PlayerView view) {
+    if (chopDiscards) {
+      for (var i = 0; i < game.hand.length; i++) {
+        final card = game.hand[i];
+        if (!card.knownNumber && !card.knownColor) {
+          return (i, view.expectedDiscardRisk(i));
+        }
+      }
+    }
     var pick = 0;
     var pickCost = double.infinity;
     var pickRisk = 0.0;

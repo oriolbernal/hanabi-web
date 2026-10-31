@@ -39,8 +39,10 @@ class MoveLog {
     Move? advice,
     required String mode,
   }) async {
+    // Encoded before anything is awaited: the game changes right after.
+    final line = jsonEncode(encode(game, move, advice: advice, mode: mode));
     await _load();
-    _lines.add(jsonEncode(encode(game, move, advice: advice, mode: mode)));
+    _lines.add(line);
     if (_lines.length > capacity) _lines.removeRange(0, _lines.length - capacity);
     try {
       final prefs = await SharedPreferences.getInstance();
