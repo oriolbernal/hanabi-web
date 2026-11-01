@@ -196,8 +196,10 @@ beat 256×256; rounding weights to six decimals changes nothing (1.3 MB).
 
 ## The human-like player, fitted to the app's move log
 
-`analyze_moves.py` rebuilds every state the app logged (dev mode, copy icon)
-and compares the person's move with the simulated players'. Three games, 284
+`analyze_moves.py` replays the games the app logged (dev mode, copy icon:
+one JSON line per game with the dealt deck and the moves `p3`, `p3B`, `d0`,
+`h5`, `hR`, plus the advisor's suggestion; the older one-line-per-move format
+is still read) and compares the person's move with the simulated players'. Three games, 284
 decisions: the person hints whenever a hint is left and discards only at zero,
 plays uncertain cards from p ≥ 0.7 (13 of 13 fit; all five below 0.5 failed),
 discards the oldest untouched card or a hinted card that no longer matters,

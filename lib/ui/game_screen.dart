@@ -25,7 +25,16 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late Game _game = Game(strategy: widget.strategy);
+  late Game _game = _deal();
+
+  /// A fresh game; in dev mode the deck order opens its record in [MoveLog].
+  Game _deal() {
+    final deck = buildDeck();
+    if (Settings.devMode.value) {
+      MoveLog.startGame(deck, mode: widget.mode.name);
+    }
+    return Game(deck: List.of(deck), strategy: widget.strategy);
+  }
   int? _selected;
 
   /// Suggests moves and shows each card's odds (dev mode); null until loaded.
@@ -65,7 +74,7 @@ class _GameScreenState extends State<GameScreen> {
   Set<GameCard> _revealed = {};
 
   void _restart() => setState(() {
-    _game = Game(strategy: widget.strategy);
+    _game = _deal();
     _selected = null;
     _revealed = {};
     _moves++;
@@ -88,7 +97,7 @@ class _GameScreenState extends State<GameScreen> {
       target = await _askTarget();
       if (target == null) return;
     }
-    _log(PlayMove(index));
+    _log(PlayMove(index), target: target);
     final result = _game.play(index, target: target);
     setState(() {
       _selected = null;
@@ -117,13 +126,13 @@ class _GameScreenState extends State<GameScreen> {
 
   /// Dev mode: keeps the move, and the advice if it was showing, for
   /// [MoveLog].
-  void _log(Move move) {
+  void _log(Move move, {Hint? hint, CardColor? target}) {
     if (!Settings.devMode.value) return;
     MoveLog.record(
-      _game,
       move,
+      hint: hint,
+      target: target,
       advice: _adviceMoves == _moves ? _advice?.move : null,
-      mode: widget.mode.name,
     );
   }
 
@@ -136,7 +145,6 @@ class _GameScreenState extends State<GameScreen> {
   bool _thinking = false;
 
   Future<void> _hint() async {
-    if (_game.hints > 0 && _game.usefulHints.isNotEmpty) _log(HintMove());
     final Hint? picked;
     if (widget.strategy case final SearchHints search) {
       if (_game.usefulHints.isEmpty) {
@@ -162,6 +170,7 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     final hint = picked;
+    _log(HintMove(), hint: hint);
     setState(() {
       _moves++;
       _revealed = switch (hint) {

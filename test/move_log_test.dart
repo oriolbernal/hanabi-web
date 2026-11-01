@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,38 +9,34 @@ import 'package:hanabi/ui/move_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('the state is kept as it was before the move, not after', () async {
+  test('a game is one line: the deck dealt, then the moves and advice', () async {
     SharedPreferences.setMockInitialValues({});
-    final game = Game(random: Random(5), strategy: const DummyStrategy());
-    final future = MoveLog.record(game, DiscardMove(0), mode: 'ai');
-    game.discard(0); // The screen moves on without waiting for the log.
-    await future;
-    final line = (await MoveLog.export()).split('\n').last;
-    expect(line, contains('"hints":10'));
-    expect(line, contains('"discarded":[]'));
+    final deck = buildDeck(Random(5));
+    final game = Game(deck: List.of(deck), strategy: const DummyStrategy());
+    await MoveLog.startGame(deck, mode: 'ai');
+    final hint = game.hint()!;
+    await MoveLog.record(HintMove(), hint: hint, advice: DiscardMove(2));
+    await MoveLog.record(PlayMove(1), target: CardColor.blue);
+    game.play(1, target: CardColor.blue);
+    await MoveLog.record(DiscardMove(0), advice: DiscardMove(0));
+
+    final lines = (await MoveLog.export()).split('\n');
+    expect(lines.length, 1);
+    final entry = jsonDecode(lines.single) as Map<String, dynamic>;
+    expect(entry['mode'], 'ai');
+    expect(entry['deck'], deck.map((c) => c.toString()).join());
+    expect((entry['deck'] as String).length, 2 * deck.length);
+    expect(entry['moves'], [MoveLog.describe(HintMove(), hint: hint), 'p1B', 'd0']);
+    expect(entry['advice'], ['d2', '', 'd0']);
+    expect(await MoveLog.length, 1);
   });
 
-  test('a move is encoded with what the person saw', () {
-    final game = Game(random: Random(3), strategy: const DummyStrategy());
-    game.hint();
-    final hinted = game.hand.indexWhere((c) => c.knownNumber || c.knownColor);
-    final entry = MoveLog.encode(
-      game,
-      PlayMove(hinted),
-      advice: HintMove(),
-      mode: 'search',
-    );
-    expect(entry['move'], 'play $hinted');
-    expect(entry['advice'], 'hint');
-    expect(entry['mode'], 'search');
-    expect(entry['hints'], 9);
-    expect(entry['lives'], 3);
-    expect(entry['deck'], game.deckSize);
-    expect((entry['piles'] as List).length, CardColor.piles.length);
-    final hand = entry['hand'] as List;
-    expect(hand.length, handSize);
-    final card = hand[hinted] as Map;
-    expect(card['card'], game.hand[hinted].toString());
-    expect(card['knownNumber'] || card['knownColor'], isTrue);
+  test('moves are described compactly', () {
+    expect(MoveLog.describe(PlayMove(3)), 'p3');
+    expect(MoveLog.describe(PlayMove(3), target: CardColor.red), 'p3R');
+    expect(MoveLog.describe(DiscardMove(0)), 'd0');
+    expect(MoveLog.describe(HintMove()), 'h');
+    expect(MoveLog.describe(HintMove(), hint: NumberHint(5)), 'h5');
+    expect(MoveLog.describe(HintMove(), hint: ColorHint(CardColor.joker)), 'h*');
   });
 }

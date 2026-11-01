@@ -410,7 +410,9 @@ regles 17,41, D4 16,81, H3 19,70; l'ordre no canvia.)
 Les partides conduïdes per D4 feien 17,2 de mitjana; les conduïdes per H1,
 19,4, per H2, 19,7, i per H3, 19,9. El guany per fornada s'ha aturat (+0,37,
 +0,13, +0,07) i una xarxa quatre vegades més gran només hi suma 0,12: el que
-queda fins a la cerca (20,7) ja no surt de més dades.
+queda fins a la cerca (20,7) ja no surt de més dades. La regla "primer les
+pistes de jugar" (5.3) tampoc hi ajuda: amb H3 i el jugador humà baixa de
+19,70 a 19,03.
 
 ## 6. Lliçons
 
@@ -465,7 +467,9 @@ uv run python distill.py --data 'data/v4_*.jsonl' --out models/D.json --features
 # fornades següents: afegiu el model com a últim argument de label_hints perquè condueixi les partides
 # ... i --player=human perquè el jugador humà jugui les partides i les simulacions de la cerca
 
-# Què fas tu: enganxeu el registre de jugades de l'app (mode dev) a data/moves.jsonl
+# Què fas tu: enganxeu el registre de l'app (mode dev, icona de copiar) a data/moves.jsonl.
+# Una línia per partida: el mazo tal com s'ha repartit i les jugades (p3, d0, h5, hR),
+# amb el consell de l'assistent; l'analitzador reprodueix la partida.
 uv run python analyze_moves.py data/moves.jsonl
 
 uv run tensorboard --logdir runs                # corbes en directe

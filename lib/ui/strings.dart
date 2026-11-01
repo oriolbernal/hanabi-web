@@ -109,7 +109,7 @@ class _English extends Strings {
   @override
   String get copyLog => 'Copy move log';
   @override
-  String logCopied(int moves) => 'Copied: $moves moves';
+  String logCopied(int moves) => 'Copied: $moves games';
   @override
   String get subtitle => 'solitaire';
   @override
@@ -296,7 +296,7 @@ class _Catalan extends Strings {
   @override
   String get copyLog => 'Copia el registre de jugades';
   @override
-  String logCopied(int moves) => 'Copiat: $moves jugades';
+  String logCopied(int moves) => 'Copiat: $moves partides';
   @override
   String get subtitle => 'solitari';
   @override
@@ -494,7 +494,7 @@ class _Spanish extends Strings {
   @override
   String get copyLog => 'Copiar el registro de jugadas';
   @override
-  String logCopied(int moves) => 'Copiado: $moves jugadas';
+  String logCopied(int moves) => 'Copiado: $moves partidas';
   @override
   String get subtitle => 'solitario';
   @override

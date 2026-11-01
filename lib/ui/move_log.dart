@@ -6,18 +6,23 @@ import '../game/card.dart';
 import '../game/game.dart';
 import '../sim/simulated_player.dart';
 
-/// Every move the person makes, with what they could see at the time, kept
-/// on the device (dev mode). Exported as JSON lines, it shows how people
-/// really play, to compare with the simulated players and tune them.
+/// Every game the person plays, kept on the device (dev mode): the deck in
+/// the order it was dealt, then each move, with what the advisor suggested
+/// when it was showing. Exported as JSON lines, one per game, it is small
+/// enough to paste into a chat; `rl/analyze_moves.py` replays it to see how
+/// people really play and to tune the simulated players.
+///
+/// Moves are `p3` (play card 3; a joker above 1 adds the pile, `p3B`),
+/// `d0` (discard card 0) and `h5` / `hR` (the hint that was given).
 class MoveLog {
   MoveLog._();
 
-  static const _key = 'moveLog';
+  static const _key = 'gameLog';
 
-  /// Oldest moves are dropped beyond this many.
-  static const capacity = 3000;
+  /// Oldest games are dropped beyond this many.
+  static const capacity = 300;
 
-  static final List<String> _lines = [];
+  static final List<Map<String, dynamic>> _games = [];
   static bool _loaded = false;
 
   static Future<void> _load() async {
@@ -25,76 +30,79 @@ class MoveLog {
     _loaded = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      _lines.addAll(prefs.getStringList(_key) ?? const []);
+      for (final line in prefs.getStringList(_key) ?? const []) {
+        _games.add(jsonDecode(line) as Map<String, dynamic>);
+      }
     } catch (_) {
       // Storage may be unavailable (private browsing): keep it in memory.
     }
   }
 
-  /// Records [move], about to be made in [game], and what the advisor
-  /// suggested, if it was showing.
-  static Future<void> record(
-    Game game,
-    Move move, {
-    Move? advice,
-    required String mode,
-  }) async {
-    // Encoded before anything is awaited: the game changes right after.
-    final line = jsonEncode(encode(game, move, advice: advice, mode: mode));
-    await _load();
-    _lines.add(line);
-    if (_lines.length > capacity) _lines.removeRange(0, _lines.length - capacity);
+  static Future<void> _save() async {
+    if (_games.length > capacity) {
+      _games.removeRange(0, _games.length - capacity);
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_key, _lines);
+      await prefs.setStringList(_key, [for (final g in _games) jsonEncode(g)]);
     } catch (_) {}
   }
 
-  /// The log as JSON lines, oldest first.
+  /// Starts a game record: [deck] is the whole shuffled deck, hand first.
+  static Future<void> startGame(
+    List<GameCard> deck, {
+    required String mode,
+  }) async {
+    final game = <String, dynamic>{
+      'at': DateTime.now().toIso8601String(),
+      'mode': mode,
+      'deck': deck.map((c) => c.toString()).join(),
+      'moves': <String>[],
+      'advice': <String>[],
+    };
+    await _load();
+    _games.add(game);
+    await _save();
+  }
+
+  /// Records [move], about to be made, and what the advisor suggested, if it
+  /// was showing. For a hint, [hint] is the one given; for a joker played
+  /// onto a chosen pile, [target] is that pile.
+  static Future<void> record(
+    Move move, {
+    Hint? hint,
+    CardColor? target,
+    Move? advice,
+  }) async {
+    final moveText = describe(move, hint: hint, target: target);
+    final adviceText = advice == null ? '' : describe(advice);
+    await _load();
+    if (_games.isEmpty) return;
+    (_games.last['moves'] as List).add(moveText);
+    (_games.last['advice'] as List).add(adviceText);
+    await _save();
+  }
+
+  /// The log as JSON lines, one game each, oldest first.
   static Future<String> export() async {
     await _load();
-    return _lines.join('\n');
+    return [for (final g in _games) jsonEncode(g)].join('\n');
   }
 
+  /// How many games are kept.
   static Future<int> get length async {
     await _load();
-    return _lines.length;
+    return _games.length;
   }
 
-  /// One move as JSON: the state the person saw (and the real cards, which
-  /// the log may know), then the move.
-  static Map<String, dynamic> encode(
-    Game game,
-    Move move, {
-    Move? advice,
-    required String mode,
-  }) => {
-    'at': DateTime.now().toIso8601String(),
-    'mode': mode,
-    'piles': [
-      for (final c in CardColor.piles) game.fireworks.top(c)?.number ?? 0,
-    ],
-    'hints': game.hints,
-    'lives': game.errors,
-    'deck': game.deckSize,
-    'hand': [
-      for (final card in game.hand)
-        {
-          'card': card.toString(),
-          'knownNumber': card.knownNumber,
-          'knownColor': card.knownColor,
-          'notNumbers': card.notNumbers.toList()..sort(),
-          'notColors': [for (final c in card.notColors) c.symbol],
+  static String describe(Move move, {Hint? hint, CardColor? target}) =>
+      switch (move) {
+        PlayMove(:final index) => 'p$index${target?.symbol ?? ''}',
+        DiscardMove(:final index) => 'd$index',
+        HintMove() => switch (hint) {
+          NumberHint(:final number) => 'h$number',
+          ColorHint(:final color) => 'h${color.symbol}',
+          null => 'h',
         },
-    ],
-    'discarded': [for (final c in game.discarded) c.toString()],
-    'move': describe(move),
-    if (advice != null) 'advice': describe(advice),
-  };
-
-  static String describe(Move move) => switch (move) {
-    PlayMove(:final index) => 'play $index',
-    DiscardMove(:final index) => 'discard $index',
-    HintMove() => 'hint',
-  };
+      };
 }

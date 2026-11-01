@@ -2,10 +2,15 @@
 
     uv run python analyze_moves.py data/moves.jsonl [--since 2026-10-31T22:00]
 
-Rebuilds each logged state, asks the simulated players what they would have
-done, and summarizes the decisions that distinguish players: hinting versus
-discarding at each hint count, plays of uncertain cards, and which card gets
-discarded. The numbers feed the "human" ExpertPlayer settings.
+The log has one JSON line per game: the deck in the order it was dealt and
+the moves (`p3`, `p3B` for a joker onto the blue pile, `d0`, `h5`, `hR`),
+with the advisor's suggestion for each move when it was showing. The older
+format, one line per move with the whole visible state, is still read.
+
+Each state is rebuilt, the simulated players are asked what they would have
+done, and the decisions that distinguish players are summarized: hinting
+versus discarding at each hint count, plays of uncertain cards, and which
+card gets discarded. The numbers feed the "human" ExpertPlayer settings.
 """
 
 from __future__ import annotations
@@ -13,13 +18,25 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 
 from hanabi.game import PILES, Card, Fireworks, Game, PlayerView, PLAYERS
 
 SYMBOLS = "RGBYW*"
 
 
+@dataclass
+class Decision:
+    """One state the person saw and what they did there."""
+
+    game: Game
+    kind: str  # play, discard, hint
+    index: int
+    advice: tuple[str, int] | None
+
+
 def build(entry: dict) -> Game:
+    """A game in the state an old-format line describes."""
     g = Game.__new__(Game)
     g.deck = [Card(1, 0) for _ in range(entry["deck"])]
     g.hand = [
@@ -43,8 +60,61 @@ def build(entry: dict) -> Game:
 
 
 def parse_move(text: str) -> tuple[str, int]:
-    kind, *rest = text.split()
-    return kind, int(rest[0]) if rest else -1
+    """Both spellings: 'play 3' / 'hint' and 'p3' / 'd0' / 'h5' / 'hR'."""
+    if " " in text or text == "hint":
+        kind, *rest = text.split()
+        return kind, int(rest[0]) if rest else -1
+    kind = {"p": "play", "d": "discard", "h": "hint"}[text[0]]
+    if kind == "hint":
+        return kind, -1
+    return kind, int(text[1])
+
+
+def apply(game: Game, text: str) -> None:
+    """Replays one compact move on the game."""
+    kind, index = parse_move(text)
+    if kind == "hint":
+        game.hints -= 1
+        value = text[1:]
+        if value.isdigit():
+            game.apply_hint(("n", int(value)))
+        elif value:
+            game.apply_hint(("c", SYMBOLS.index(value)))
+    elif kind == "play":
+        target = SYMBOLS.index(text[2]) if len(text) > 2 else None
+        game.play(index, target=target)
+    else:
+        game.discard(index)
+
+
+def decisions(entries: list[dict]) -> tuple[list[Decision], list[int]]:
+    """Every decision in the log, and the final score of each game."""
+    result: list[Decision] = []
+    scores: list[int] = []
+    old_game_open = False
+    for k, e in enumerate(entries):
+        if "deck" in e and isinstance(e["deck"], str):
+            cards = [Card(int(e["deck"][i]), SYMBOLS.index(e["deck"][i + 1]))
+                     for i in range(0, len(e["deck"]), 2)]
+            game = Game(cards)
+            for move, advice in zip(e["moves"], e["advice"]):
+                kind, index = parse_move(move)
+                result.append(Decision(game.copy(), kind, index, parse_move(advice) if advice else None))
+                apply(game, move)
+            scores.append(game.score)
+            continue
+        # Old format: a new game starts with a full deck and all hints.
+        if e["deck"] == 50 and e["hints"] == 10 and not e["discarded"] and not any(e["piles"]):
+            if old_game_open:
+                scores.append(sum(entries[k - 1]["piles"]))
+            old_game_open = True
+        kind, index = parse_move(e["move"])
+        advice = parse_move(e["advice"]) if "advice" in e else None
+        result.append(Decision(build(e), kind, index, advice))
+        if k + 1 == len(entries) or "deck" in entries[k + 1] and isinstance(entries[k + 1]["deck"], str):
+            scores.append(sum(e["piles"]))  # the last old game, maybe unfinished
+            old_game_open = False
+    return result, scores
 
 
 def fits(game: Game, card: Card) -> bool:
@@ -73,16 +143,8 @@ def main() -> None:
         if e["at"] >= args.since:
             entries.append(e)
 
-    games = 0
-    scores: list[int] = []
-    for k, e in enumerate(entries):
-        if e["deck"] == 50 and e["hints"] == 10 and not e["discarded"] and not any(e["piles"]):
-            games += 1
-            if k:
-                scores.append(sum(entries[k - 1]["piles"]))
-    if entries:
-        scores.append(sum(entries[-1]["piles"]))  # the last game, maybe unfinished
-    print(f"{len(entries)} moves, {games} games, final piles summed: {scores}\n")
+    all_decisions, scores = decisions(entries)
+    print(f"{len(all_decisions)} moves, {len(scores)} games, final scores: {scores}\n")
 
     by_hints: dict[int, Counter] = defaultdict(Counter)
     sure_play = Counter()
@@ -93,9 +155,8 @@ def main() -> None:
     total = 0
     advice_agree = Counter()
 
-    for e in entries:
-        game = build(e)
-        kind, index = parse_move(e["move"])
+    for d in all_decisions:
+        game, kind, index = d.game, d.kind, d.index
         view = PlayerView(game)
         n = len(game.hand)
         sure = [i for i in range(n) if view.surely_playable(i)]
@@ -106,9 +167,9 @@ def main() -> None:
             move = PLAYERS[name](game)
             if move[0] == kind and (kind == "hint" or move[1] == index):
                 agree[name] += 1
-        if "advice" in e:
+        if d.advice is not None:
             advice_agree["total"] += 1
-            if e["advice"] == e["move"]:
+            if d.advice == (kind, index):
                 advice_agree["same"] += 1
 
         if sure:
