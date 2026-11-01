@@ -236,6 +236,15 @@ class ExpertPlayer extends SimulatedPlayer {
     var bestP = 0.0;
     for (var i = 0; i < n; i++) {
       if (wastesJoker(game, i)) continue;
+      final card = game.hand[i];
+      // A known joker of unknown number fits almost anywhere, but people
+      // wait to be told the number before they play it (move log).
+      if (jokerNeedsNumber &&
+          card.knownColor &&
+          card.color == CardColor.joker &&
+          !card.knownNumber) {
+        continue;
+      }
       final p = view.playProbability(i);
       if (p > bestP) {
         best = i;

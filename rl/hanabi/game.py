@@ -572,6 +572,10 @@ class ExpertPlayer:
         for i in range(n):
             if wastes_joker(game, i):
                 continue
+            card = game.hand[i]
+            # A known joker of unknown number: people wait for the number.
+            if self.joker_needs_number and card.known_color and card.is_joker and not card.known_number:
+                continue
             p = view.play_probability(i)
             if p > best_p:
                 best, best_p = i, p
