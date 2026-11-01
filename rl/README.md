@@ -231,7 +231,11 @@ inside the search rollouts, and the network distilled from that data wins:
 
 Each network is good for the player its search simulated and bad for the
 other, so the app ships H3, its search mode simulates the human player and
-the dev-mode advisor follows the human rules. Games driven by D4 averaged
+the dev-mode advisor follows the human rules. (After the joker-pile fix,
+where a pile made only of jokers stays colorless, and with the human player
+also waiting for a joker's number before a likely play, that player scores
+about half a point less with every hint giver: rules 17.41, D4 16.81,
+H3 19.70; the ranking is unchanged.) Games driven by D4 averaged
 17.2, those driven by H1 19.4, by H2 19.7 and by H3 19.9; the gain per batch
 has flattened (+0.37, +0.13, +0.07) and a four-times-bigger network adds only
 0.12, so what is left up to the search (20.7) will not come from more data. D5 (D4's recipe with 377k

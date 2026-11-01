@@ -403,6 +403,10 @@ Cada xarxa és bona per al jugador que simulava la seva cerca i dolenta per a
 l'altre: **les pistes depenen de qui les rebrà.** Com que tu t'assembles al
 jugador humà (74%) i no a l'Expert (45%), l'app porta ara H3, el mode "Cerca"
 simula el jugador humà i l'assistent del mode dev segueix les seves regles.
+(Després d'arreglar la pila de comodins, que ara no agafa color fins que hi
+cau una carta real, i de fer que el jugador humà tampoc arrisqui un comodí
+sense saber-ne el número, aquest jugador fa mig punt menys amb tothom:
+regles 17,41, D4 16,81, H3 19,70; l'ordre no canvia.)
 Les partides conduïdes per D4 feien 17,2 de mitjana; les conduïdes per H1,
 19,4, per H2, 19,7, i per H3, 19,9. El guany per fornada s'ha aturat (+0,37,
 +0,13, +0,07) i una xarxa quatre vegades més gran només hi suma 0,12: el que
