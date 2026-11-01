@@ -395,14 +395,17 @@ xarxa destil·lada d'aquestes dades (H1, 82.000 pistes) capgira el resultat:
 | H1b (130.000, la primera fornada sencera) | 19,52 | |
 | H2 (240.000, la segona fornada conduïda per H1) | 19,72 | 18,76 |
 | **H3** (348.000, la tercera conduïda per H2) ← a l'app | **19,85** | |
+| H4 (456.000, la quarta conduïda per H3) | 19,92 | |
+| H3 amb xarxa 512×512 (model de 5 MB) | 19,97 | |
 
 Cada xarxa és bona per al jugador que simulava la seva cerca i dolenta per a
 l'altre: **les pistes depenen de qui les rebrà.** Com que tu t'assembles al
 jugador humà (74%) i no a l'Expert (45%), l'app porta ara H3, el mode "Cerca"
 simula el jugador humà i l'assistent del mode dev segueix les seves regles.
 Les partides conduïdes per D4 feien 17,2 de mitjana; les conduïdes per H1,
-19,4, i per H2, 19,7. El guany per fornada es va fent petit (+0,37, +0,13);
-la cerca és a 20,7.
+19,4, per H2, 19,7, i per H3, 19,9. El guany per fornada s'ha aturat (+0,37,
++0,13, +0,07) i una xarxa quatre vegades més gran només hi suma 0,12: el que
+queda fins a la cerca (20,7) ja no surt de més dades.
 
 ## 6. Lliçons
 

@@ -225,10 +225,13 @@ inside the search rollouts, and the network distilled from that data wins:
 | H1b (130k, the whole first batch, games driven by D4) | 19.52 | |
 | H2 (240k, second batch driven by H1) | 19.72 | 18.76 |
 | **H3** (348k, third batch driven by H2) — in the app | **19.85** | |
+| H4 (456k, fourth batch driven by H3) | 19.92 | |
+| H3 as a 512×512 network (5 MB model) | 19.97 | |
 
 Each network is good for the player its search simulated and bad for the
 other, so the app ships H3, its search mode simulates the human player and
 the dev-mode advisor follows the human rules. Games driven by D4 averaged
-17.2, those driven by H1 19.4 and by H2 19.7; the gain per batch is
-shrinking (+0.37, +0.13) and the search makes 20.7. D5 (D4's recipe with 377k
+17.2, those driven by H1 19.4, by H2 19.7 and by H3 19.9; the gain per batch
+has flattened (+0.37, +0.13, +0.07) and a four-times-bigger network adds only
+0.12, so what is left up to the search (20.7) will not come from more data. D5 (D4's recipe with 377k
 hints) made 20.51 with the Expert player: doubling the data is flattening out.
