@@ -226,7 +226,8 @@ inside the search rollouts, and the network distilled from that data wins:
 | H2 (240k, second batch driven by H1) | 19.72 | 18.76 |
 | **H3** (348k, third batch driven by H2) — in the app | **19.85** | |
 | H4 (456k, fourth batch driven by H3) | 19.92 | |
-| H3 as a 512×512 network (5 MB model) | 19.97 | |
+| H3 as a 512×512 network (4 MB model) | 19.97 | |
+| H4 as a 512×512 network | 19.94 | |
 
 Each network is good for the player its search simulated and bad for the
 other, so the app ships H3, its search mode simulates the human player and

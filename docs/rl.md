@@ -396,7 +396,8 @@ xarxa destil·lada d'aquestes dades (H1, 82.000 pistes) capgira el resultat:
 | H2 (240.000, la segona fornada conduïda per H1) | 19,72 | 18,76 |
 | **H3** (348.000, la tercera conduïda per H2) ← a l'app | **19,85** | |
 | H4 (456.000, la quarta conduïda per H3) | 19,92 | |
-| H3 amb xarxa 512×512 (model de 5 MB) | 19,97 | |
+| H3 amb xarxa 512×512 (model de 4 MB) | 19,97 | |
+| H4 amb xarxa 512×512 | 19,94 | |
 
 Cada xarxa és bona per al jugador que simulava la seva cerca i dolenta per a
 l'altre: **les pistes depenen de qui les rebrà.** Com que tu t'assembles al
