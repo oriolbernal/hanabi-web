@@ -55,10 +55,10 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     // The search, and the network distilled from it, pick hints expecting
-    // the expert's way of playing; the trained agent plays badly with them
-    // (16.5 points against the expert's 20.3), so the advice follows the
-    // same explicit rules the hints were made for.
-    _advisor = ExpertPlayer.tuned;
+    // the human-like way of playing (fitted to the move log), so the advice
+    // follows those same explicit rules: with these hints they score more
+    // than the Expert rules, and the trained agent plays badly with them.
+    _advisor = ExpertPlayer.human;
   }
 
   /// Cards revealed by the last hint, highlighted until the next move.

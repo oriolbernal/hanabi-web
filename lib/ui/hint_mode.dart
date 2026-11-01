@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 
 import '../game/game.dart';
+import '../sim/expert.dart';
 import '../sim/hint_search.dart';
 import '../sim/rl_strategy.dart';
 import '../sim/smart_strategies.dart';
@@ -22,7 +23,11 @@ enum HintMode {
     HintMode.classic => const DummyStrategy(),
     HintMode.smart => const LookaheadStrategy(),
     HintMode.ai => await _rlStrategy,
-    HintMode.search => SearchHints(),
+    // The search simulates the human-like player, the one fitted to the
+    // move log; against that player it scores 20.7 to the rules' 17.6.
+    HintMode.search => SearchHints(
+      search: HintSearch(player: ExpertPlayer.human),
+    ),
   };
 
   static final Future<HintStrategy> _rlStrategy = rootBundle

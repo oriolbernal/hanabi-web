@@ -16,8 +16,9 @@ TensorBoard (`rl/runs/`) i es regeneren amb `cd rl && uv run python plots.py`.
 | ... amb jugadors que arrisquen i valoren els comodins | ~18,6 |
 | ... amb un agent jugador entrenat amb RL | 19,6 |
 | ... entrenant pistes i jugador l'un per a l'altre | 20,2 |
-| **IA de pistes destil·lada de la cerca (D4), amb el jugador de regles Expert** | **20,4** |
-| Cerca en viu (mode "Cerca", lent) | 21,5 |
+| IA de pistes destil·lada de la cerca (D4), amb el jugador de regles Expert | 20,4 |
+| Cerca en viu (mode "Cerca", lent), amb el jugador Expert | 21,5 |
+| **Amb el jugador ajustat a com jugues tu:** regles → D4 → **H1** (a l'app) → cerca | 17,9 → 17,3 → **19,4** → 20,7 |
 | Sostre: un jugador que veu les seves cartes | 23,9 |
 
 Les dues primeres xifres i les de la IA de pistes són contra el jugador simulat
@@ -383,8 +384,20 @@ contra 19,4), i **D4 hi perd**: 17,31 contra 17,92 de les regles, perquè va
 aprendre d'una cerca que simulava l'Expert. En canvi la cerca que simula el
 jugador humà hi arriba a **20,7** (100 partides, +3,1 sobre les regles): hi ha
 tres punts per destil·lar. La fornada següent de dades (`--player=human` a
-`label_hints`) posa el jugador humà a les partides i dins la cerca; el
-resultat (H1) s'afegirà aquí.
+`label_hints`) posa el jugador humà a les partides i dins la cerca, i la
+xarxa destil·lada d'aquestes dades (H1, 82.000 pistes) capgira el resultat:
+
+| pistes (2.000 partides de test) | jugador humà | jugador Expert |
+|---|---|---|
+| regles Expert | 17,92 | 19,35 |
+| D4 (destil·lada per a l'Expert) | 17,31 | 20,43 |
+| **H1** (destil·lada per a l'humà) ← a l'app | **19,35** | 18,77 |
+
+Cada xarxa és bona per al jugador que simulava la seva cerca i dolenta per a
+l'altre: **les pistes depenen de qui les rebrà.** Com que tu t'assembles al
+jugador humà (74%) i no a l'Expert (45%), l'app porta ara H1, el mode "Cerca"
+simula el jugador humà i l'assistent del mode dev segueix les seves regles.
+Les fornades següents es condueixen amb H1.
 
 ## 6. Lliçons
 
@@ -404,6 +417,9 @@ resultat (H1) s'afegirà aquí.
 8. **Si tens un mestre lent, imita'l.** Quan el senyal és petit respecte al
    soroll, destil·lar una cerca que fa mitjanes (D2-D4) ha batut PPO, que
    aprèn partida a partida. I avalua sempre contra un jugador fix i llegible.
+9. **Les pistes depenen de qui les rep.** La xarxa feta per a l'Expert perd
+   amb el jugador humà i a l'inrevés (5.11); cal mesurar com juga la persona
+   de debò (el registre de jugades) i entrenar per a aquest jugador.
 
 ## 7. Com reproduir-ho
 

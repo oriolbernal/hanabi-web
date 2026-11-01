@@ -213,6 +213,17 @@ reserve 1, chop discards, `joker_needs_number`:
 
 Against this player the Expert hint rules score 17.92 and **D4 drops to 17.31**
 (it was distilled from a search that simulated the Expert), while the search
-simulating the human player makes 20.70 (100 games, +3.10). The next batches
-(`label_hints ... --player=human`) put the human player both in the games and
-inside the search rollouts.
+simulating the human player makes 20.70 (100 games, +3.10). Labeling with
+`label_hints ... --player=human` puts the human player both in the games and
+inside the search rollouts, and the network distilled from that data wins:
+
+| hints (2,000 test games) | human-like player | Expert player |
+|---|---|---|
+| Expert hint rules | 17.92 | 19.35 |
+| D4 (distilled for the Expert) | 17.31 | 20.43 |
+| **H1** (distilled for the human player, 82k hints) — in the app | **19.35** | 18.77 |
+
+Each network is good for the player its search simulated and bad for the
+other, so the app ships H1, its search mode simulates the human player and
+the dev-mode advisor follows the human rules. D5 (D4's recipe with 377k
+hints) made 20.51 with the Expert player: doubling the data is flattening out.
