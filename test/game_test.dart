@@ -54,6 +54,41 @@ void main() {
       expect(f.play(c(2, CardColor.blue)), isFalse);
     });
 
+    test('a joker stacked on the floating joker keeps the pile colorless', () {
+      final f = Fireworks();
+      f.play(c(1, CardColor.joker));
+      expect(f.play(c(2, CardColor.joker), target: CardColor.red), isTrue);
+      expect(f.floatingJoker, CardColor.red);
+      // A blue 3 claims the stack: it moves to the blue pile.
+      expect(f.play(c(3, CardColor.blue)), isTrue);
+      expect(f.pile(CardColor.red), isEmpty);
+      expect(f.pile(CardColor.blue).map((x) => x.number), [1, 2, 3]);
+      expect(f.floatingJoker, isNull);
+    });
+
+    test('the real 1 of the stack\'s pile still pushes the stack aside', () {
+      final f = Fireworks();
+      f.play(c(1, CardColor.joker));
+      f.play(c(2, CardColor.joker), target: CardColor.red);
+      expect(f.play(c(1, CardColor.red)), isTrue);
+      expect(f.top(CardColor.red)!.color, CardColor.red);
+      expect(f.pile(CardColor.green).length, 2);
+      expect(f.floatingJoker, CardColor.green);
+    });
+
+    test('playable cards count the plays that move the joker stack', () {
+      final f = Fireworks();
+      f.play(c(1, CardColor.joker));
+      bool playable(GameCard card) =>
+          f.playableCards().any((p) => p.sameAs(card));
+      expect(playable(c(2, CardColor.blue)), isTrue);
+      expect(playable(c(1, CardColor.red)), isTrue);
+      expect(playable(c(3, CardColor.blue)), isFalse);
+      f.play(c(2, CardColor.joker), target: CardColor.red);
+      expect(playable(c(3, CardColor.blue)), isTrue);
+      expect(playable(c(2, CardColor.blue)), isFalse);
+    });
+
     test('higher jokers go on the chosen pile', () {
       final f = Fireworks();
       f.play(c(1, CardColor.green));

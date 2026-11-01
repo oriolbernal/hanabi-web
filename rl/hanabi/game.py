@@ -101,11 +101,20 @@ class Fireworks:
         return card.number == 1 if t is None else card.number - t.number == 1
 
     def floating_joker(self) -> int | None:
+        """The pile holding only jokers (its color is not decided yet), if any."""
         for c in PILES:
             p = self.piles[c]
-            if len(p) == 1 and p[0].is_joker:
+            if p and all(card.is_joker for card in p):
                 return c
         return None
+
+    def _fits_by_moving_joker(self, card: Card) -> bool:
+        source = self.floating_joker()
+        if source is None:
+            return False
+        if card.color == source:
+            return card.number == 1 and any(c != source and not self.piles[c] for c in PILES)
+        return not self.piles[card.color] and card.number == self.piles[source][-1].number + 1
 
     def play(self, card: Card, target: int | None = None) -> bool:
         if card.is_joker:
@@ -126,23 +135,21 @@ class Fireworks:
         return self._play_by_moving_joker(card)
 
     def _play_by_moving_joker(self, card: Card) -> bool:
-        source = self.floating_joker()
-        if source is None:
+        if not self._fits_by_moving_joker(card):
             return False
-        joker = self.piles[source][0]
+        source = self.floating_joker()
+        stack = list(self.piles[source])
         self.piles[source].clear()
-        for c in PILES:
-            if self.piles[c]:
-                continue
-            self.piles[c].append(joker)
-            if self.fits(card, card.color):
-                self.piles[card.color].append(card)
-                return True
-            self.piles[c].clear()
-        self.piles[source].append(joker)
-        return False
+        if card.color == source:
+            to = next(c for c in PILES if c != source and not self.piles[c])
+        else:
+            to = card.color
+        self.piles[to].extend(stack)
+        self.piles[card.color].append(card)
+        return True
 
     def playable_cards(self) -> list[Card]:
+        """Port of Fireworks.playableCards, including plays that move the joker stack."""
         result = []
         for c in PILES:
             t = self.top(c)
@@ -150,6 +157,15 @@ class Fireworks:
                 result += [Card(1, c), Card(1, JOKER)]
             elif t.number < 5:
                 result += [Card(t.number + 1, c), Card(t.number + 1, JOKER)]
+        source = self.floating_joker()
+        if source is not None:
+            nxt = self.piles[source][-1].number + 1
+            for c in PILES:
+                if c == source:
+                    if self._fits_by_moving_joker(Card(1, c)):
+                        result.append(Card(1, c))
+                elif nxt <= 5 and not self.piles[c]:
+                    result.append(Card(nxt, c))
         return result
 
     @property
