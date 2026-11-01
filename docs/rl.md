@@ -18,7 +18,7 @@ TensorBoard (`rl/runs/`) i es regeneren amb `cd rl && uv run python plots.py`.
 | ... entrenant pistes i jugador l'un per a l'altre | 20,2 |
 | IA de pistes destil·lada de la cerca (D4), amb el jugador de regles Expert | 20,4 |
 | Cerca en viu (mode "Cerca", lent), amb el jugador Expert | 21,5 |
-| **Amb el jugador ajustat a com jugues tu:** regles → D4 → **H2** (a l'app) → cerca | 17,9 → 17,3 → **19,7** → 20,7 |
+| **Amb el jugador ajustat a com jugues tu:** regles → D4 → **H3** (a l'app) → cerca | 17,9 → 17,3 → **19,9** → 20,7 |
 | Sostre: un jugador que veu les seves cartes | 23,9 |
 
 Les dues primeres xifres i les de la IA de pistes són contra el jugador simulat
@@ -393,14 +393,16 @@ xarxa destil·lada d'aquestes dades (H1, 82.000 pistes) capgira el resultat:
 | D4 (destil·lada per a l'Expert) | 17,31 | 20,43 |
 | H1 (destil·lada per a l'humà, 82.000 pistes) | 19,35 | 18,77 |
 | H1b (130.000, la primera fornada sencera) | 19,52 | |
-| **H2** (240.000, la segona fornada conduïda per H1) ← a l'app | **19,72** | 18,76 |
+| H2 (240.000, la segona fornada conduïda per H1) | 19,72 | 18,76 |
+| **H3** (348.000, la tercera conduïda per H2) ← a l'app | **19,85** | |
 
 Cada xarxa és bona per al jugador que simulava la seva cerca i dolenta per a
 l'altre: **les pistes depenen de qui les rebrà.** Com que tu t'assembles al
-jugador humà (74%) i no a l'Expert (45%), l'app porta ara H2, el mode "Cerca"
+jugador humà (74%) i no a l'Expert (45%), l'app porta ara H3, el mode "Cerca"
 simula el jugador humà i l'assistent del mode dev segueix les seves regles.
 Les partides conduïdes per D4 feien 17,2 de mitjana; les conduïdes per H1,
-19,4. El guany per fornada encara no s'ha aturat (la cerca és a 20,7).
+19,4, i per H2, 19,7. El guany per fornada es va fent petit (+0,37, +0,13);
+la cerca és a 20,7.
 
 ## 6. Lliçons
 
