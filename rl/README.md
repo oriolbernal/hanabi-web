@@ -242,3 +242,34 @@ H3 19.70; the ranking is unchanged.) Games driven by D4 averaged
 has flattened (+0.37, +0.13, +0.07) and a four-times-bigger network adds only
 0.12, so what is left up to the search (20.7) will not come from more data. D5 (D4's recipe with 377k
 hints) made 20.51 with the Expert player: doubling the data is flattening out.
+
+**Tied hints.** In the app H3 said "two 5s" before "a 1" on the first move. Over
+300 opening hands with two 5s and one 1 the network values the two hints within
+0.01 points (median; 0.07 at most) and picks the 5 in 155: a coin toss, because
+the simulated player asks for both hints anyway, so the order does not change
+the score. Since the order is worth nothing to the score but matters to a
+person, `RlStrategy(playMargin: 0.2, playChance: 0.7)` breaks the tie: a hint
+after which the player sees a likely play (p ≥ 0.7, the human player's
+threshold) wins whenever the network values it within 0.2 points of its
+favourite. Unlike `playFirst`, which always rules (and costs 0.67 against the
+human player), it only settles near-ties. 2,000 games, human player:
+
+| margin | mean | first hint gives a likely play when one exists | all hints |
+|---|---|---|---|
+| none (H3 alone) | 19.71 | 82% | 75% |
+| **0.2** ← in the app | 19.66 | **100%** | 93% |
+| 0.3 | 19.59 | 100% | 96% |
+| 0.5 | 19.52 | 100% | 98% |
+| Expert hint rules | 17.41 | 100% | 93% |
+
+The search mode applies the same tie-break to its rollout averages, which are
+noisier than the network and need a wider margin (100 games, ±0.55):
+
+| search margin | mean | first hint likely play | all |
+|---|---|---|---|
+| none | 20.71 | 21% | 49% |
+| 0.2 | 20.77 | 50% | 72% |
+| **0.5** ← in the app | 20.74 | 80% | 89% |
+| 1.0 | 20.53 | 100% | 95% |
+
+`hint_eval ... --margin=0.5 --chance=0.7 --search=32` reports both percentages.

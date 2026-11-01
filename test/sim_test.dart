@@ -240,4 +240,38 @@ void main() {
     game.play(0); // green 1 is on the table: a 1 is no longer surely playable
     expect(RlStrategy(weights, playFirst: true).choose(game), NumberHint(1));
   });
+
+  test('the play margin lets a likely play win a near tie, not a clear loss', () {
+    // A network that values every number hint 1 point above the color hints,
+    // and "5" 0.1 above the other numbers.
+    final weights = {
+      'features': 'v1',
+      'layers': [
+        {
+          'w': [List.filled(observationSize, 0.0)],
+          'b': [1.0],
+        },
+        {
+          'w': [
+            for (var a = 0; a < actionCount; a++) [a < 5 ? 1.0 : 0.0],
+          ],
+          'b': [for (var a = 0; a < actionCount; a++) a == 4 ? 0.1 : 0.0],
+        },
+      ],
+    };
+    final game = Game(
+      deck: [
+        GameCard(5, CardColor.blue),
+        GameCard(5, CardColor.yellow),
+        GameCard(1, CardColor.white),
+        GameCard(3, CardColor.red),
+        GameCard(2, CardColor.green),
+        GameCard(2, CardColor.yellow),
+      ],
+    );
+    expect(RlStrategy(weights).choose(game), NumberHint(5));
+    expect(RlStrategy(weights, playMargin: 0.2).choose(game), NumberHint(1));
+    // The colors would give a sure play too, but they are a point behind.
+    expect(RlStrategy(weights, playMargin: 0.05).choose(game), NumberHint(5));
+  });
 }

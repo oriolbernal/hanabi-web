@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../game/game.dart';
 import 'expert.dart';
+import 'rl_strategy.dart';
 import 'simulated_player.dart';
 import 'simulation.dart';
 
@@ -17,6 +18,8 @@ class HintSearch {
   HintSearch({
     this.player = ExpertPlayer.tuned,
     this.laterHints = const ExpertHints(),
+    this.playMargin = 0,
+    this.playChance = 0.7,
     Random? random,
   }) : _random = random ?? Random();
 
@@ -25,6 +28,13 @@ class HintSearch {
 
   /// Gives the later hints inside the imagined games.
   final HintStrategy laterHints;
+
+  /// Tie-break for people: a hint after which the player sees a chance of
+  /// at least [playChance] of fitting a card wins whenever its average is
+  /// within [playMargin] points of the best. Hints the player will ask for
+  /// anyway come out nearly tied, and "it's a 1" should go before "two 5s".
+  final double playMargin;
+  final double playChance;
   final Random _random;
 
   /// Average final score of each useful hint after [rounds] games each.
@@ -37,7 +47,7 @@ class HintSearch {
   }
 
   Hint? best(Game game, {int rounds = 24}) =>
-      _best(evaluate(game, rounds: rounds));
+      _best(game, evaluate(game, rounds: rounds));
 
   /// Like [best], but stops after about [budget] (and at least [minRounds]
   /// games per hint), pausing between games so the screen stays responsive.
@@ -54,11 +64,30 @@ class HintSearch {
       search.round();
       await Future<void>.delayed(Duration.zero);
     }
-    return _best(search.results());
+    return _best(game, search.results());
   }
 
-  static Hint? _best(List<(Hint, double)> scored) =>
-      scored.isEmpty ? null : scored.reduce((a, b) => b.$2 > a.$2 ? b : a).$1;
+  Hint? _best(Game game, List<(Hint, double)> scored) {
+    if (scored.isEmpty) return null;
+    (Hint, double) top(Iterable<(Hint, double)> some) =>
+        some.reduce((a, b) => b.$2 > a.$2 ? b : a);
+    final best = top(scored);
+    if (playMargin <= 0) return best.$1;
+    final chance = {
+      for (final (h, _) in scored)
+        h: RlStrategy.playChanceAfter(game, hintToAction(h)),
+    };
+    final most = chance.values.reduce(max);
+    if (most < playChance ||
+        most <= RlStrategy.playChanceAfter(game, null) + 1e-9) {
+      return best.$1;
+    }
+    final legible = top([
+      for (final s in scored)
+        if (chance[s.$1]! >= most - 1e-9) s,
+    ]);
+    return legible.$2 >= best.$2 - playMargin ? legible.$1 : best.$1;
+  }
 }
 
 class _Search {

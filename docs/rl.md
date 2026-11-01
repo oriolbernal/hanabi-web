@@ -414,6 +414,40 @@ queda fins a la cerca (20,7) ja no surt de més dades. La regla "primer les
 pistes de jugar" (5.3) tampoc hi ajuda: amb H3 i el jugador humà baixa de
 19,70 a 19,03.
 
+**Les pistes empatades.** Jugant, H3 va dir "tens dos 5" abans que "tens un
+1" a la primera jugada. Mirant 300 mans inicials amb dos 5 i un 1, la xarxa
+valora les dues pistes quasi igual (diferència mediana 0,01 punts, màxima
+0,07) i tria el 5 en 155: és una moneda a l'aire. Té sentit des de la
+simulació: el jugador demanarà les dues pistes igualment, així que l'ordre no
+canvia la puntuació, i salvar els 5 val una mica més del que ell en creu. Com
+que l'ordre no val res però a tu et molesta, ara un **desempat llegible**: si
+alguna pista deixa el jugador amb una carta que probablement encaixa (p ≥
+0,7, el llindar del jugador humà) i la xarxa la valora a menys de 0,2 punts
+de la millor, aquella guanya. No és la regla de 5.3 (que mana sempre i costa
+0,67): només decideix els empats. Amb el jugador humà, 2.000 partides:
+
+| marge | mitjana | 1a pista jugable quan n'hi ha | pistes jugables quan n'hi ha |
+|---|---|---|---|
+| cap (H3 sol) | 19,71 | 82% | 75% |
+| **0,2** ← a l'app | 19,66 | **100%** | 93% |
+| 0,3 | 19,59 | 100% | 96% |
+| 0,5 | 19,52 | 100% | 98% |
+| regles Expert | 17,41 | 100% | 93% |
+
+El mode "Cerca" porta el mateix desempat sobre les mitjanes dels 32 rollouts,
+que fan més soroll que la xarxa i per això necessiten un marge més ample
+(100 partides, ±0,55):
+
+| marge a la cerca | mitjana | 1a pista jugable | totes |
+|---|---|---|---|
+| cap | 20,71 | 21% | 49% |
+| 0,2 | 20,77 | 50% | 72% |
+| **0,5** ← a l'app | 20,74 | 80% | 89% |
+| 1,0 | 20,53 | 100% | 95% |
+
+Ho mesura `hint_eval` amb `--margin=0.5 --chance=0.7 --search=32`, que ara
+també treu el percentatge de pistes accionables.
+
 ## 6. Lliçons
 
 1. **Mesurar abans de canviar.** Cada salt gran ha vingut d'una mesura que ens

@@ -197,6 +197,8 @@ class RlStrategy extends HintStrategy {
     Map<String, dynamic> weights, {
     this.name = 'rl',
     this.playFirst = false,
+    this.playMargin = 0,
+    this.playChance = 0.5,
   }) : _encode = switch (weights['features'] ?? 'v1') {
          'v1' => encodeObservation,
          'v2' => encodeObservationV2,
@@ -218,25 +220,39 @@ class RlStrategy extends HintStrategy {
   /// "it's a 1" (87%) before "it's red" (30%), which the network may not.
   final bool playFirst;
 
+  /// Softer version of [playFirst]: a hint that gives a likely play wins
+  /// whenever the network values it within [playMargin] points of the best
+  /// hint. 0 leaves the choice to the network alone.
+  final double playMargin;
+
+  /// A hint "gives a likely play" when, after it, the player sees a chance
+  /// of at least [playChance] of fitting a card that really fits.
+  final double playChance;
+
   /// Scores for each of the [actionCount] actions; higher is preferred.
   List<double> logits(List<double> input) => _net(input);
 
   @override
   Hint? choose(Game game) {
-    var allowed = {for (final h in game.usefulHints) hintToAction(h)};
+    final allowed = {for (final h in game.usefulHints) hintToAction(h)};
     if (allowed.isEmpty) return null;
-    if (playFirst) {
+    final scores = logits(_encode(game));
+    int pick(Iterable<int> actions) =>
+        actions.reduce((a, b) => scores[b] > scores[a] ? b : a);
+    final best = pick(allowed);
+    if (playFirst || playMargin > 0) {
       final chance = {for (final a in allowed) a: playChanceAfter(game, a)};
-      final best = chance.values.reduce(max);
-      if (best >= 0.5 && best > playChanceAfter(game, null) + 1e-9) {
-        allowed = {
+      final top = chance.values.reduce(max);
+      if (top >= playChance && top > playChanceAfter(game, null) + 1e-9) {
+        final legible = pick([
           for (final a in allowed)
-            if (chance[a]! >= best - 1e-9) a,
-        };
+            if (chance[a]! >= top - 1e-9) a,
+        ]);
+        if (playFirst || scores[legible] >= scores[best] - playMargin) {
+          return actionToHint(legible);
+        }
       }
     }
-    final scores = logits(_encode(game));
-    final best = allowed.reduce((a, b) => scores[b] > scores[a] ? b : a);
     return actionToHint(best);
   }
 
