@@ -279,16 +279,11 @@ class _CoopScreenState extends State<CoopScreen> {
                 final cardWidth = ((constraints.maxWidth - 32 - 4 * 10) / 5)
                     .clamp(40.0, 84.0);
                 final partnerWidth = (cardWidth * 0.62).clamp(32.0, 52.0);
-                return CustomScrollView(
-                  slivers: [
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _body(cardWidth, partnerWidth),
-                      ),
-                    ),
-                  ],
+                // Only the discards scroll, so your hand and the hints
+                // you receive always stay in sight.
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _body(cardWidth, partnerWidth),
                 );
               },
             ),
