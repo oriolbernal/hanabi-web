@@ -5,7 +5,9 @@
 // labelled, so the bots also learn to play next to someone like you.
 //
 //   dart run bin/coop_label.dart <from seed> <to seed> <rounds> <out.jsonl>
-//       [--net=model.json] [--rollout-net] [--players=2,3,4]
+//       [--net=model.json] [--rollout-net] [--players=2,3,4] [--person]
+//
+// --person puts the model of the person in seat 0 in every game.
 //
 // One JSON line per move: "s" the state features, "c" the features of each
 // candidate, "v" the search's value of each candidate.
@@ -41,9 +43,13 @@ void main(List<String> args) {
       .split(',')
       .map(int.parse)
       .toList();
-  final search = CoopSearch(
+  final random = Random(from);
+  // In games with the person, the imagined games play their seat the way
+  // the person does (QuickPersonPolicy).
+  CoopSearch searchFor(bool withPerson) => CoopSearch(
     rounds: rounds,
-    random: Random(from),
+    random: random,
+    person: withPerson ? 0 : null,
     rollout: args.contains('--rollout-net') && net != null ? net.decide : null,
   );
   const person = CoopBot(player: ExpertPlayer.human);
@@ -52,8 +58,10 @@ void main(List<String> args) {
   for (var seed = from; seed < to; seed++) {
     final players = playerCounts[seed % playerCounts.length];
     final game = CoopGame(players: players, random: Random(seed));
+    final withPerson = seed.isEven || args.contains('--person');
+    final search = searchFor(withPerson);
     while (!game.isOver) {
-      if (game.current == 0 && seed.isEven) {
+      if (game.current == 0 && withPerson) {
         game.apply(person.decide(game));
         continue;
       }

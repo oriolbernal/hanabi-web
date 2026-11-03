@@ -34,6 +34,7 @@ void main(List<String> args) {
       if (a.startsWith('--search='))
         'search ${a.substring(9)}': CoopSearch(
           rounds: int.parse(a.substring(9)),
+          person: allBots ? null : 0,
           random: Random(1),
         ).decide,
     for (final a in args)

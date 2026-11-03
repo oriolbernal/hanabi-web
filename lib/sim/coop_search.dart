@@ -69,6 +69,43 @@ class QuickCoopPolicy {
   }
 }
 
+/// A quick model of the person, fitted to the co-op move log: plays a card
+/// the hints say fits, or one at least 70% likely to fit with a life to
+/// spare, else gives a hint whenever a token is left (as [QuickCoopPolicy]
+/// would, or any new information), else discards the oldest untouched card.
+class QuickPersonPolicy {
+  const QuickPersonPolicy();
+
+  CoopMove decide(CoopGame game) {
+    final me = game.current;
+    final view = game.viewFor(me);
+    final pv = PlayerView(view);
+    var best = -1;
+    var bestP = 0.0;
+    for (var i = 0; i < view.hand.length; i++) {
+      final p = pv.playProbability(i);
+      if (p > bestP) {
+        best = i;
+        bestP = p;
+      }
+    }
+    if (best >= 0 && (bestP >= 0.999 || (bestP >= 0.7 && game.errors > 1))) {
+      return CoopPlay(best);
+    }
+    if (game.hints > 0) {
+      final quick = const QuickCoopPolicy().decide(game);
+      if (quick is CoopHint) return quick;
+      for (var k = 1; k < game.players; k++) {
+        final p = (me + k) % game.players;
+        final options = game.hintsFor(p);
+        if (options.isNotEmpty) return CoopHint(p, options.first);
+      }
+    }
+    final chop = view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
+    return CoopDiscard(chop < 0 ? 0 : chop);
+  }
+}
+
 /// A co-op bot that thinks ahead: for a handful of sensible moves (what
 /// [CoopBot] would do, likely plays, the safest discards, the best hints
 /// for each player) it imagines the rest of the game many times, its own
@@ -80,9 +117,14 @@ class CoopSearch {
     this.rounds = 24,
     this.base = const CoopBot(),
     CoopMove Function(CoopGame)? rollout,
+    this.person,
     Random? random,
   }) : rollout = rollout ?? const QuickCoopPolicy().decide,
        _random = random ?? Random();
+
+  /// The person's seat, played in the imagined games by [QuickPersonPolicy];
+  /// null when every seat is a bot.
+  final int? person;
 
   final int rounds;
   final CoopBot base;
@@ -152,7 +194,9 @@ class CoopSearch {
     final random = Random(seed);
     var turns = 0;
     while (!g.isOver && turns++ < 200) {
-      final m = rollout(g);
+      final m = g.current == person
+          ? const QuickPersonPolicy().decide(g)
+          : rollout(g);
       if (m case CoopPlay(:final index) when g.needsTarget(index)) {
         final c = g.hands[g.current][index];
         final fits = [

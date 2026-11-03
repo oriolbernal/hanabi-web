@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../game/card.dart';
 import '../game/coop.dart';
 import '../game/game.dart';
+import '../sim/coop_net.dart';
 import '../sim/coop_search.dart';
 import 'card_view.dart';
 import 'game_screen.dart';
@@ -42,9 +45,28 @@ class _CoopScreenState extends State<CoopScreen> {
     return CoopGame(players: widget.players, deck: List.of(deck));
   }
 
-  /// Each bot imagines the rest of the game 128 times per candidate move
-  /// (bin/coop_search_bench.dart: +0.9 points with four players).
-  final _bot = CoopSearch(rounds: 128);
+  /// With three or four players, the network trained on the search
+  /// (rl/models/C5: 23.4 and 23.9 points against the rules' 22.5 and 22.7,
+  /// bin/coop_eval.dart). With two, where the person is the bots' only
+  /// partner, the search that imagines the person's way of playing (21.4
+  /// against 21.1); the network does not beat the rules there yet.
+  late final CoopMove Function(CoopGame) _decide = widget.players == 2
+      ? CoopSearch(rounds: 128, person: 0).decide
+      : (CoopGame g) => _net?.decide(g) ?? _fallback.decide(g);
+
+  static CoopNet? _net;
+  static final _fallback = CoopSearch(rounds: 128);
+
+  /// Loads the network once; until it is there, the search plays.
+  static final Future<void> _loading = rootBundle
+      .loadString('assets/models/coop_policy.json')
+      .then((json) => _net = CoopNet(jsonDecode(json) as Map<String, dynamic>));
+
+  @override
+  void initState() {
+    super.initState();
+    _loading.then((_) {}, onError: (_) {});
+  }
 
   /// Pause before each bot moves, so you can follow what happens.
   static const _botDelay = Duration(milliseconds: 1100);
@@ -121,7 +143,7 @@ class _CoopScreenState extends State<CoopScreen> {
       await Future<void>.delayed(_botDelay);
       if (!mounted || round != _round) return;
       // About 0.1 s on a laptop browser.
-      final move = _bot.decide(_game);
+      final move = _decide(_game);
       setState(() => _apply(move));
     }
     if (_game.isOver) await _showEnd();
