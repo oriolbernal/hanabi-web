@@ -10,11 +10,11 @@ import 'simulated_player.dart';
 ///
 /// On its turn, in this order:
 /// 1. Plays a card that surely fits.
-/// 2. Gives a hint that lets someone play a card for sure: to the person
-///    first, then to whoever plays soonest.
-/// 3. Warns the person, or else the next player, off a card they would
-///    otherwise throw away and that cannot be lost (the last copy of a
-///    needed card, or a joker).
+/// 2. Gives a hint that lets someone play a card for sure, to whoever plays
+///    soonest.
+/// 3. Warns a player, the soonest first, off a card they would otherwise
+///    throw away and that cannot be lost (the last copy of a needed card,
+///    or a joker).
 /// 4. Does what [player] would do in the solitaire: discard a useless card,
 ///    play a likely one or keep hints in reserve; where it would ask for a
 ///    hint, it gives the most useful one instead.
@@ -28,10 +28,8 @@ class CoopBot {
 
   final ExpertPlayer player;
 
-  /// The seat of the person, or null if every seat is a bot. The person
-  /// comes first when choosing whom to tell, and their chop is guarded
-  /// whenever they play: they do not know the bots' habits, and a person
-  /// who never hears a hint has no game.
+  /// The seat of the person, or null if every seat is a bot. Nobody is
+  /// favoured: the seat only says how to predict that player's moves.
   final int? person;
 
   /// How the person is expected to play: fitted to the app's move log.
@@ -46,13 +44,12 @@ class CoopBot {
 
     if (decision.reason == MoveReason.surePlay) return _toMove(game, decision);
     if (game.hints > 0) {
-      final next = (me + 1) % game.players;
       final urgent =
           _surePlayHint(game, me) ??
-          (person != null && person != me
-              ? _protectHint(game, person!)
-              : null) ??
-          _protectHint(game, next);
+          _others(
+            game,
+            me,
+          ).map((p) => _protectHint(game, p)).nonNulls.firstOrNull;
       if (urgent != null) return urgent;
     }
     switch (decision.reason) {
@@ -66,11 +63,9 @@ class CoopBot {
     }
   }
 
-  /// The other players, the person first, then the order they play in.
-  Iterable<int> _others(CoopGame game, int me) => [
-    if (person != null && person != me) person!,
-    for (var k = 1; k < game.players; k++)
-      if ((me + k) % game.players != person) (me + k) % game.players,
+  /// The other players in the order they play after [me].
+  static Iterable<int> _others(CoopGame game, int me) => [
+    for (var k = 1; k < game.players; k++) (me + k) % game.players,
   ];
 
   ExpertPlayer _model(int seat) => seat == person ? personPlayer : player;
