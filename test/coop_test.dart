@@ -8,8 +8,8 @@ import 'package:hanabi/sim/coop_bot.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 
 void main() {
-  test('hands of five, or four with four players', () {
-    for (final (players, size) in [(2, 5), (3, 5), (4, 4)]) {
+  test('hands of five, whatever the number of players', () {
+    for (final (players, size) in [(2, 5), (3, 5), (4, 5)]) {
       final game = CoopGame(players: players, random: Random(1));
       expect(game.hands.length, players);
       expect(game.hands.every((h) => h.length == size), isTrue);

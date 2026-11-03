@@ -32,7 +32,7 @@ class CoopHint extends CoopMove {
 }
 
 /// Hanabi for 2-4 players who take turns, with this app's cards (jokers
-/// included), hint tokens and lives. Nobody sees their own hand, everyone
+/// included), hint tokens, lives and five cards in every hand. Nobody sees their own hand, everyone
 /// sees the others'. On a turn a player plays a card, discards one (winning
 /// a hint token back) or spends a token to tell another player which of
 /// their cards have one number or one color. When the deck runs out, every
@@ -64,8 +64,8 @@ class CoopGame {
   /// Turns left once the deck is empty, or null while it still has cards.
   int? turnsLeft;
 
-  /// Cards per hand: five, or four with four players, as in Hanabi.
-  int get handSize => players >= 4 ? 4 : 5;
+  /// Cards per hand: five, whatever the number of players.
+  int get handSize => 5;
 
   int get deckSize => _deck.length;
   int get score => fireworks.score;
