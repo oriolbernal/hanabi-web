@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/card.dart';
+import '../game/coop.dart';
 import '../game/game.dart';
 import '../sim/simulated_player.dart';
 
@@ -14,6 +15,10 @@ import '../sim/simulated_player.dart';
 ///
 /// Moves are `p3` (play card 3; a joker above 1 adds the pile, `p3B`),
 /// `d0` (discard card 0) and `h5` / `hR` (the hint that was given).
+///
+/// A cooperative game (mode `coop2` to `coop4`) deals the deck hand by hand,
+/// player 0 (the person) first, and records every player's move in turn
+/// order; a hint names its receiver, `h2:5` or `h1:R`.
 class MoveLog {
   MoveLog._();
 
@@ -82,6 +87,23 @@ class MoveLog {
     (_games.last['advice'] as List).add(adviceText);
     await _save();
   }
+
+  /// Records a move of a cooperative game, whoever made it.
+  static Future<void> recordCoop(CoopMove move) async {
+    await _load();
+    if (_games.isEmpty) return;
+    (_games.last['moves'] as List).add(describeCoop(move));
+    (_games.last['advice'] as List).add('');
+    await _save();
+  }
+
+  static String describeCoop(CoopMove move) => switch (move) {
+    CoopPlay(:final index, :final target) => 'p$index${target?.symbol ?? ''}',
+    CoopDiscard(:final index) => 'd$index',
+    CoopHint(:final to, hint: NumberHint(:final number)) => 'h$to:$number',
+    CoopHint(:final to, hint: ColorHint(:final color)) =>
+      'h$to:${color.symbol}',
+  };
 
   /// The log as JSON lines, one game each, oldest first.
   static Future<String> export() async {

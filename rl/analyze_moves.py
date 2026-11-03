@@ -140,6 +140,9 @@ def main() -> None:
         if not line.endswith("}"):
             continue
         e = json.loads(line)
+        # Cooperative games have several hands: see bin/coop_replay.dart.
+        if str(e.get("mode", "")).startswith("coop"):
+            continue
         if e["at"] >= args.since:
             entries.append(e)
 

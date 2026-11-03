@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../game/card.dart';
 import '../game/coop.dart';
@@ -6,6 +7,7 @@ import '../game/game.dart';
 import '../sim/coop_bot.dart';
 import 'card_view.dart';
 import 'game_screen.dart';
+import 'move_log.dart';
 import 'palette.dart';
 import 'settings.dart';
 import 'strings.dart';
@@ -29,7 +31,17 @@ class CoopScreen extends StatefulWidget {
 typedef _Pick = ({int player, int index});
 
 class _CoopScreenState extends State<CoopScreen> {
-  late CoopGame _game = CoopGame(players: widget.players);
+  late CoopGame _game = _deal();
+
+  /// A fresh game; in dev mode the deck order opens its record in [MoveLog].
+  CoopGame _deal() {
+    final deck = buildDeck();
+    if (Settings.devMode.value) {
+      MoveLog.startGame(deck, mode: 'coop${widget.players}');
+    }
+    return CoopGame(players: widget.players, deck: List.of(deck));
+  }
+
   static const _bot = CoopBot();
 
   /// Pause before each bot moves, so you can follow what happens.
@@ -60,7 +72,7 @@ class _CoopScreenState extends State<CoopScreen> {
 
   void _restart() => setState(() {
     _round++;
-    _game = CoopGame(players: widget.players);
+    _game = _deal();
     _selected = null;
     _news.clear();
     _revealed.clear();
@@ -71,6 +83,7 @@ class _CoopScreenState extends State<CoopScreen> {
   /// Applies [move] for the current player and reports it.
   void _apply(CoopMove move) {
     final who = _game.current;
+    if (Settings.devMode.value) MoveLog.recordCoop(move);
     final String text;
     switch (move) {
       case CoopPlay(:final index, :final target):
@@ -220,6 +233,23 @@ class _CoopScreenState extends State<CoopScreen> {
           ],
         ),
         actions: [
+          if (Settings.devMode.value)
+            IconButton(
+              tooltip: tr.copyLog,
+              icon: const Icon(Icons.copy_all),
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: await MoveLog.export()),
+                );
+                final games = await MoveLog.length;
+                if (!mounted) return;
+                setState(() {
+                  _news
+                    ..clear()
+                    ..add(tr.logCopied(games));
+                });
+              },
+            ),
           IconButton(
             tooltip: tr.newGame,
             icon: const Icon(Icons.refresh),
