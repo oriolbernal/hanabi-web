@@ -160,6 +160,9 @@ class PlayerView {
         _seen.update(_key(c.number, c.color), (v) => v + 1, ifAbsent: () => 1);
       }
     }
+    for (final c in game.inSight) {
+      _seen.update(_key(c.number, c.color), (v) => v + 1, ifAbsent: () => 1);
+    }
   }
 
   final Game game;

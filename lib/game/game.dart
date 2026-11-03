@@ -72,13 +72,36 @@ class Game {
       errors = other.errors {
     hand.addAll([for (final c in other.hand) c.copy()]);
     discarded.addAll(other.discarded);
+    inSight.addAll(other.inSight);
     if (random != null) _deck.shuffle(random);
+  }
+
+  /// One player's seat in a game with several hands (see `CoopGame`):
+  /// [hand] is theirs and [inSight] the other hands, which they can see.
+  Game.view({
+    required List<GameCard> hand,
+    required List<GameCard> deck,
+    required List<GameCard> discarded,
+    required Fireworks fireworks,
+    required this.hints,
+    required this.errors,
+    List<GameCard> inSight = const [],
+    this.strategy = const DummyStrategy(),
+  }) : _deck = [for (final c in deck) c.copy()],
+       fireworks = Fireworks.copy(fireworks) {
+    this.hand.addAll([for (final c in hand) c.copy()]);
+    this.discarded.addAll(discarded);
+    this.inSight.addAll(inSight);
   }
 
   final List<GameCard> _deck;
   final HintStrategy strategy;
   final List<GameCard> hand = [];
   final List<GameCard> discarded = [];
+
+  /// Cards the player can see besides the table: the other players' hands
+  /// in a cooperative game, none in the solitaire.
+  final List<GameCard> inSight = [];
   final Fireworks fireworks;
   int hints = maxHints;
   int errors = allowedErrors;

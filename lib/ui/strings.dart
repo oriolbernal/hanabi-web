@@ -87,6 +87,25 @@ abstract class Strings {
   String get wild;
   String get noDiscards;
 
+  // Cooperative game. A null name means the person ("you").
+  String get gameHeader;
+  String get solo;
+  String get coop;
+  String get coopSubtitle;
+  String get playersHeader;
+  String coopDescription(int players);
+  String get you;
+  String get yourTurn;
+  String botThinking(String name);
+  String get tapCardCoop;
+  String get noHintTokens;
+  String lastRound(int turns);
+  String cardName(GameCard c) => '${c.number} ${colorName(c.color)}';
+  String playedBy(String? name, GameCard c, {required bool fits});
+  String discardedBy(String? name, GameCard c);
+  String hintedBy(String? giver, String? receiver, Hint hint);
+  String teamScore(int score);
+
   // Advisor.
   String advicePlay(int card, String chance);
   String adviceDiscard(int card, String points);
@@ -223,6 +242,59 @@ class _English extends Strings {
   String get wild => 'wild';
   @override
   String get noDiscards => 'Nothing discarded yet';
+
+  @override
+  String get gameHeader => 'GAME';
+  @override
+  String get solo => 'Solitaire';
+  @override
+  String get coop => 'Co-op';
+  @override
+  String get coopSubtitle => 'together';
+  @override
+  String get playersHeader => 'PLAYERS';
+  @override
+  String coopDescription(int players) {
+    final bots = players - 1;
+    return 'You and $bots ${bots == 1 ? 'bot' : 'bots'}. You see their cards, '
+        'not yours: you give them hints and they give you hints.';
+  }
+
+  @override
+  String get you => 'You';
+  @override
+  String get yourTurn => 'Your turn';
+  @override
+  String botThinking(String name) => '$name is thinking…';
+  @override
+  String get tapCardCoop =>
+      "Tap one of your cards to play or discard it, or a partner's card "
+      'to give them a hint';
+  @override
+  String get noHintTokens => 'No hint tokens left: discard to win one back';
+  @override
+  String lastRound(int turns) =>
+      'Last round: $turns ${turns == 1 ? 'turn' : 'turns'} left';
+  @override
+  String playedBy(String? name, GameCard c, {required bool fits}) => fits
+      ? '${name ?? 'You'} played a ${cardName(c)}.'
+      : 'Misfire! ${name ?? 'You'} played a ${cardName(c)}.';
+  @override
+  String discardedBy(String? name, GameCard c) =>
+      '${name ?? 'You'} discarded a ${cardName(c)}.';
+  @override
+  String hintedBy(String? giver, String? receiver, Hint hint) {
+    final what = switch (hint) {
+      NumberHint(:final number) => '${number}s',
+      ColorHint(color: CardColor.joker) => 'jokers',
+      ColorHint(:final color) => colorName(color),
+    };
+    return '${giver ?? 'You'} ${giver == null ? 'tell' : 'tells'} '
+        '${receiver ?? 'you'} which cards are $what.';
+  }
+
+  @override
+  String teamScore(int score) => 'The team scored $score / 25';
 
   @override
   String advicePlay(int card, String chance) =>
@@ -419,6 +491,65 @@ class _Catalan extends Strings {
   String get noDiscards => 'Encara no has descartat res';
 
   @override
+  String get gameHeader => 'JOC';
+  @override
+  String get solo => 'Solitari';
+  @override
+  String get coop => 'Cooperatiu';
+  @override
+  String get coopSubtitle => 'en equip';
+  @override
+  String get playersHeader => 'JUGADORS';
+  @override
+  String coopDescription(int players) {
+    final bots = players - 1;
+    return 'Tu i $bots ${bots == 1 ? 'bot' : 'bots'}. Veus les seves cartes '
+        "però no les teves: tu els dones pistes i ells te'n donen a tu.";
+  }
+
+  @override
+  String get you => 'Tu';
+  @override
+  String get yourTurn => 'Et toca';
+  @override
+  String botThinking(String name) => '$name pensa…';
+  @override
+  String get tapCardCoop =>
+      'Toca una carta teva per jugar-la o descartar-la, o una carta '
+      "d'un company per donar-li una pista";
+  @override
+  String get noHintTokens =>
+      "No queden pistes: descarta una carta per recuperar-ne una";
+  @override
+  String lastRound(int turns) =>
+      'Última ronda: ${turns == 1 ? 'queda 1 torn' : 'queden $turns torns'}';
+  @override
+  String playedBy(String? name, GameCard c, {required bool fits}) => fits
+      ? (name == null
+            ? 'Has jugat un ${cardName(c)}.'
+            : '$name ha jugat un ${cardName(c)}.')
+      : (name == null
+            ? 'Error! Has jugat un ${cardName(c)}.'
+            : 'Error! $name ha jugat un ${cardName(c)}.');
+  @override
+  String discardedBy(String? name, GameCard c) => name == null
+      ? 'Has descartat un ${cardName(c)}.'
+      : '$name ha descartat un ${cardName(c)}.';
+  @override
+  String hintedBy(String? giver, String? receiver, Hint hint) {
+    final what = switch (hint) {
+      NumberHint(:final number) => '$number',
+      ColorHint(:final color) => colorsName(color),
+    };
+    if (giver == null) return 'Has dit a $receiver quines cartes són $what.';
+    if (receiver == null) return '$giver et diu quines cartes són $what.';
+    return '$giver diu a $receiver quines cartes són $what.';
+  }
+
+  @override
+  String teamScore(int score) => "L'equip ha fet $score punts de 25";
+
+  @override
   String advicePlay(int card, String chance) =>
       'Juga la carta $card · $chance que encaixi';
   @override
@@ -613,6 +744,65 @@ class _Spanish extends Strings {
   String get wild => 'libre';
   @override
   String get noDiscards => 'Aún no has descartado nada';
+
+  @override
+  String get gameHeader => 'JUEGO';
+  @override
+  String get solo => 'Solitario';
+  @override
+  String get coop => 'Cooperativo';
+  @override
+  String get coopSubtitle => 'en equipo';
+  @override
+  String get playersHeader => 'JUGADORES';
+  @override
+  String coopDescription(int players) {
+    final bots = players - 1;
+    return 'Tú y $bots ${bots == 1 ? 'bot' : 'bots'}. Ves sus cartas pero no '
+        'las tuyas: tú les das pistas y ellos te las dan a ti.';
+  }
+
+  @override
+  String get you => 'Tú';
+  @override
+  String get yourTurn => 'Te toca';
+  @override
+  String botThinking(String name) => '$name piensa…';
+  @override
+  String get tapCardCoop =>
+      'Toca una carta tuya para jugarla o descartarla, o una carta de un '
+      'compañero para darle una pista';
+  @override
+  String get noHintTokens =>
+      'No quedan pistas: descarta una carta para recuperar una';
+  @override
+  String lastRound(int turns) =>
+      'Última ronda: ${turns == 1 ? 'queda 1 turno' : 'quedan $turns turnos'}';
+  @override
+  String playedBy(String? name, GameCard c, {required bool fits}) => fits
+      ? (name == null
+            ? 'Has jugado un ${cardName(c)}.'
+            : '$name ha jugado un ${cardName(c)}.')
+      : (name == null
+            ? '¡Fallo! Has jugado un ${cardName(c)}.'
+            : '¡Fallo! $name ha jugado un ${cardName(c)}.');
+  @override
+  String discardedBy(String? name, GameCard c) => name == null
+      ? 'Has descartado un ${cardName(c)}.'
+      : '$name ha descartado un ${cardName(c)}.';
+  @override
+  String hintedBy(String? giver, String? receiver, Hint hint) {
+    final what = switch (hint) {
+      NumberHint(:final number) => '$number',
+      ColorHint(:final color) => colorsName(color),
+    };
+    if (giver == null) return 'Le has dicho a $receiver qué cartas son $what.';
+    if (receiver == null) return '$giver te dice qué cartas son $what.';
+    return '$giver le dice a $receiver qué cartas son $what.';
+  }
+
+  @override
+  String teamScore(int score) => 'El equipo ha hecho $score puntos de 25';
 
   @override
   String advicePlay(int card, String chance) =>

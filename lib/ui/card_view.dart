@@ -224,3 +224,128 @@ class MiniCard extends StatelessWidget {
     );
   }
 }
+
+/// A partner's card in the cooperative game: you see its face, and below
+/// it what its owner knows from the hints (the number, a dot of the color),
+/// so you can tell what is still worth telling.
+class FaceCardView extends StatelessWidget {
+  const FaceCardView({
+    super.key,
+    required this.card,
+    this.width = 48,
+    this.selected = false,
+    this.highlighted = false,
+    this.onTap,
+  });
+
+  final GameCard card;
+  final double width;
+  final bool selected;
+  final bool highlighted;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isJoker = card.isJoker;
+    final fg = onCardColor(card.color);
+    final face = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      width: width,
+      height: width * 1.45,
+      transform: Matrix4.translationValues(0, selected ? -8 : 0, 0),
+      decoration: BoxDecoration(
+        color: isJoker ? null : cardColor(card.color),
+        gradient: isJoker ? jokerGradient : null,
+        borderRadius: BorderRadius.circular(width * 0.14),
+        border: Border.all(
+          color: selected
+              ? accent
+              : highlighted
+              ? Colors.white
+              : Colors.white.withValues(alpha: 0.08),
+          width: selected || highlighted ? 3 : 1,
+        ),
+        boxShadow: [
+          if (highlighted)
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.5),
+              blurRadius: 12,
+            ),
+          if (selected)
+            BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 14),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Text(
+              '${card.number}',
+              style: TextStyle(
+                fontSize: width * 0.55,
+                fontWeight: FontWeight.w800,
+                color: fg,
+              ),
+            ),
+          ),
+          if (isJoker)
+            Positioned(
+              bottom: width * 0.06,
+              left: width * 0.1,
+              child: Text(
+                '★',
+                style: TextStyle(color: fg, fontSize: width * 0.22),
+              ),
+            ),
+        ],
+      ),
+    );
+    final dot = width * 0.2;
+    final known = SizedBox(
+      height: width * 0.32,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (card.knownNumber)
+            Text(
+              '${card.number}',
+              style: TextStyle(
+                fontSize: width * 0.26,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          if (card.knownNumber && card.knownColor) SizedBox(width: dot * 0.4),
+          if (card.knownColor)
+            Container(
+              width: dot,
+              height: dot,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isJoker ? null : cardColor(card.color),
+                gradient: isJoker ? jokerGradient : null,
+                border: Border.all(color: Colors.white54, width: 1),
+              ),
+            ),
+          if (!card.knownNumber && !card.knownColor)
+            Text(
+              '·',
+              style: TextStyle(
+                fontSize: width * 0.3,
+                height: 1,
+                color: textMuted,
+              ),
+            ),
+        ],
+      ),
+    );
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [face, const SizedBox(height: 4), known],
+      ),
+    );
+  }
+}

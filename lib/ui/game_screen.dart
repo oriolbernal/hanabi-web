@@ -35,6 +35,7 @@ class _GameScreenState extends State<GameScreen> {
     }
     return Game(deck: List.of(deck), strategy: widget.strategy);
   }
+
   int? _selected;
 
   /// Suggests moves and shows each card's odds (dev mode); null until loaded.
@@ -208,7 +209,7 @@ class _GameScreenState extends State<GameScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   for (final c in CardColor.piles)
-                    _PileView(
+                    PileView(
                       color: c,
                       top: _game.fireworks.top(c),
                       width: 52,
@@ -331,14 +332,20 @@ class _GameScreenState extends State<GameScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     children: [
-                      _StatusBar(game: _game),
+                      StatusBar(
+                        hints: _game.hints,
+                        lives: _game.errors,
+                        deck: _game.deckSize,
+                        score: _game.score,
+                        max: _game.maxScore(),
+                      ),
                       const SizedBox(height: 20),
                       _sectionLabel(tr.fireworks),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           for (final c in CardColor.piles)
-                            _PileView(
+                            PileView(
                               color: c,
                               top: _game.fireworks.top(c),
                               width: cardWidth,
@@ -351,7 +358,7 @@ class _GameScreenState extends State<GameScreen> {
                       Expanded(
                         child: SizedBox(
                           width: double.infinity,
-                          child: _Discards(cards: _game.discarded),
+                          child: DiscardsView(cards: _game.discarded),
                         ),
                       ),
                       _messageBar(),
@@ -553,10 +560,21 @@ class _GameScreenState extends State<GameScreen> {
   );
 }
 
-class _StatusBar extends StatelessWidget {
-  const _StatusBar({required this.game});
+class StatusBar extends StatelessWidget {
+  const StatusBar({
+    super.key,
+    required this.hints,
+    required this.lives,
+    required this.deck,
+    required this.score,
+    required this.max,
+  });
 
-  final Game game;
+  final int hints;
+  final int lives;
+  final int deck;
+  final int score;
+  final int max;
 
   @override
   Widget build(BuildContext context) {
@@ -571,23 +589,18 @@ class _StatusBar extends StatelessWidget {
           _stat(
             Icons.lightbulb,
             const Color(0xFF7CC4FF),
-            '${game.hints}/$maxHints',
+            '$hints/$maxHints',
             tr.hintsStat,
           ),
           _stat(
             Icons.local_fire_department,
             const Color(0xFFE5484D),
-            '${game.errors}/$allowedErrors',
+            '$lives/$allowedErrors',
             tr.livesStat,
           ),
-          _stat(Icons.style, textMuted, '${game.deckSize}', tr.deckStat),
-          _stat(Icons.star, accent, '${game.score}', tr.scoreStat),
-          _stat(
-            Icons.flag_outlined,
-            textMuted,
-            '${game.maxScore()}',
-            tr.maxStat,
-          ),
+          _stat(Icons.style, textMuted, '$deck', tr.deckStat),
+          _stat(Icons.star, accent, '$score', tr.scoreStat),
+          _stat(Icons.flag_outlined, textMuted, '$max', tr.maxStat),
         ],
       ),
     );
@@ -624,8 +637,9 @@ class _StatusBar extends StatelessWidget {
   }
 }
 
-class _PileView extends StatelessWidget {
-  const _PileView({
+class PileView extends StatelessWidget {
+  const PileView({
+    super.key,
     required this.color,
     required this.top,
     required this.width,
@@ -709,8 +723,8 @@ class _PileView extends StatelessWidget {
   }
 }
 
-class _Discards extends StatelessWidget {
-  const _Discards({required this.cards});
+class DiscardsView extends StatelessWidget {
+  const DiscardsView({super.key, required this.cards});
 
   final List<GameCard> cards;
 

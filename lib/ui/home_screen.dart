@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../game/card.dart';
+import '../game/coop.dart';
+import 'coop_screen.dart';
 import 'game_screen.dart';
 import 'hint_mode.dart';
 import 'palette.dart';
@@ -18,7 +20,18 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   HintMode _mode = HintMode.ai;
 
+  /// Solitaire, or a cooperative game with bots.
+  bool _coop = false;
+  int _players = 3;
+
   Future<void> _play() async {
+    if (_coop) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => CoopScreen(players: _players)),
+      );
+      return;
+    }
     final mode = _mode;
     final strategy = await mode.load();
     if (!mounted) return;
@@ -49,6 +62,51 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 40,
           child: Text(
             _mode.description,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: textMuted, fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _gameSelector() {
+    return Column(
+      children: [
+        Text(tr.gameHeader, style: _headerStyle),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(value: false, label: Text(tr.solo)),
+            ButtonSegment(value: true, label: Text(tr.coop)),
+          ],
+          selected: {_coop},
+          onSelectionChanged: (s) => setState(() => _coop = s.first),
+        ),
+      ],
+    );
+  }
+
+  Widget _playersSelector() {
+    return Column(
+      children: [
+        Text(tr.playersHeader, style: _headerStyle),
+        const SizedBox(height: 8),
+        SegmentedButton<int>(
+          showSelectedIcon: false,
+          segments: [
+            for (var n = 2; n <= maxPlayers; n++)
+              ButtonSegment(value: n, label: Text('$n')),
+          ],
+          selected: {_players},
+          onSelectionChanged: (s) => setState(() => _players = s.first),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 40,
+          child: Text(
+            tr.coopDescription(_players),
             textAlign: TextAlign.center,
             style: const TextStyle(color: textMuted, fontSize: 13),
           ),
@@ -122,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    tr.subtitle,
+                    _coop ? tr.coopSubtitle : tr.subtitle,
                     style: const TextStyle(
                       fontSize: 16,
                       color: textMuted,
@@ -132,7 +190,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 28),
                   SizedBox(width: 280, child: _languageSelector()),
                   const SizedBox(height: 24),
-                  SizedBox(width: 280, child: _modeSelector()),
+                  SizedBox(width: 280, child: _gameSelector()),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: 280,
+                    child: _coop ? _playersSelector() : _modeSelector(),
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: 240,
