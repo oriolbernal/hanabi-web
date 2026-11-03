@@ -69,6 +69,87 @@ class QuickCoopPolicy {
   }
 }
 
+/// A sharper quick policy for the imagined games. It reasons, as cheaply
+/// as possible, from what each card could still be after the hints
+/// (positive and negative, without counting the cards in sight):
+/// plays a card every possibility of which fits; else gives the hint that
+/// turns a fitting card of the soonest player into a sure play; else
+/// discards a card no possibility of which is still needed, else the
+/// oldest card no hint has touched.
+class SharpCoopPolicy {
+  const SharpCoopPolicy();
+
+  static List<(int, CardColor)> _options(GameCard c) => [
+    for (final color in c.knownColor ? [c.color] : CardColor.values)
+      if (!c.notColors.contains(color))
+        for (final n in c.knownNumber ? [c.number] : const [1, 2, 3, 4, 5])
+          if (!c.notNumbers.contains(n)) (n, color),
+  ];
+
+  static bool _fits(CoopGame g, int n, CardColor color) {
+    final f = g.fireworks;
+    final card = GameCard(n, color);
+    if (color != CardColor.joker) return f.fits(card, color);
+    return CardColor.piles.any((p) => f.fits(card, p));
+  }
+
+  static bool _dead(CoopGame g, int n, CardColor color) {
+    final f = g.fireworks;
+    final piles = color == CardColor.joker ? CardColor.piles : [color];
+    return piles.every((p) => (f.top(p)?.number ?? 0) >= n);
+  }
+
+  static bool _surePlay(CoopGame g, GameCard c) {
+    final o = _options(c);
+    return o.isNotEmpty && o.every((x) => _fits(g, x.$1, x.$2));
+  }
+
+  CoopMove decide(CoopGame game) {
+    final me = game.current;
+    final hand = game.hands[me];
+    for (var i = 0; i < hand.length; i++) {
+      if (_surePlay(game, hand[i])) return CoopPlay(i);
+    }
+    if (game.hints > 0) {
+      final playable = game.fireworks.playableCards();
+      for (var k = 1; k < game.players; k++) {
+        final p = (me + k) % game.players;
+        final other = game.hands[p];
+        if (other.any((c) => _surePlay(game, c))) continue; // busy already
+        for (final c in other) {
+          if (!playable.any(c.sameAs)) continue;
+          for (final hint in [NumberHint(c.number), ColorHint(c.color)]) {
+            final after = c.copy();
+            if (hint is NumberHint) {
+              after.knownNumber = true;
+            } else {
+              after.knownColor = true;
+            }
+            if (_surePlay(game, after)) return CoopHint(p, hint);
+          }
+        }
+      }
+    }
+    if (game.hints < maxHints || game.hints == 0) {
+      for (var i = 0; i < hand.length; i++) {
+        final o = _options(hand[i]);
+        if (o.isNotEmpty && o.every((x) => _dead(game, x.$1, x.$2))) {
+          return CoopDiscard(i);
+        }
+      }
+      var chop = hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
+      if (chop < 0) {
+        chop = hand.indexWhere(
+          (c) =>
+              !(c.knownNumber && c.number == 5) && !(c.knownColor && c.isJoker),
+        );
+      }
+      return CoopDiscard(chop < 0 ? 0 : chop);
+    }
+    return const QuickCoopPolicy().decide(game);
+  }
+}
+
 /// A quick model of the person, fitted to the co-op move log: plays a card
 /// the hints say fits, or one at least 70% likely to fit with a life to
 /// spare, else gives a hint whenever a token is left (as [QuickCoopPolicy]
@@ -118,6 +199,7 @@ class CoopSearch {
     this.base = const CoopBot(),
     CoopMove Function(CoopGame)? rollout,
     this.person,
+    this.minPlayChance = 0.4,
     Random? random,
   }) : rollout = rollout ?? const QuickCoopPolicy().decide,
        _random = random ?? Random();
@@ -125,6 +207,12 @@ class CoopSearch {
   /// The person's seat, played in the imagined games by [QuickPersonPolicy];
   /// null when every seat is a bot.
   final int? person;
+
+  /// A card is only a candidate to play if it fits for sure or, with a
+  /// life to spare, at least this likely; with the deck empty any card may
+  /// be tried. Blind plays look reckless to a person even when they pay
+  /// off on average.
+  final double minPlayChance;
 
   final int rounds;
   final CoopBot base;
@@ -232,6 +320,13 @@ class CoopSearch {
     for (final (i, _) in plays.take(2)) {
       add(CoopPlay(i));
     }
+    bool reckless(CoopMove m) {
+      if (m is! CoopPlay || game.deckSize == 0) return false;
+      final p = pv.playProbability(m.index);
+      if (pv.surelyPlayable(m.index)) return false;
+      return game.errors <= 1 || p < minPlayChance;
+    }
+
     if (game.hints < maxHints) {
       final chop = view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
       if (chop >= 0) add(CoopDiscard(chop));
@@ -246,7 +341,22 @@ class CoopSearch {
         }
       }
     }
-    return result.values.toList();
+    final safe = [
+      for (final m in result.values)
+        if (!reckless(m)) m,
+    ];
+    if (safe.isEmpty) {
+      // Only reckless plays left (all tokens in hand, nothing new to tell):
+      // a discard wastes nothing but the token it cannot win back.
+      final chop = view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
+      final safest = ExpertPlayer.tuned.decideWithReason(view..hints = 0).move;
+      safe.add(
+        safest is DiscardMove
+            ? CoopDiscard(safest.index)
+            : CoopDiscard(max(chop, 0)),
+      );
+    }
+    return safe;
   }
 
   static String _key(CoopMove m) => switch (m) {

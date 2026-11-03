@@ -28,6 +28,13 @@ void main(List<String> args) {
         ].firstOrNull ??
         '9000',
   );
+  final minPlay = double.parse(
+    [
+          for (final a in args)
+            if (a.startsWith('--min-play=')) a.substring(11),
+        ].firstOrNull ??
+        '0.4',
+  );
   final bots = <String, CoopMove Function(CoopGame)>{
     'rules': const CoopBot().decide,
     for (final a in args)
@@ -35,25 +42,33 @@ void main(List<String> args) {
         'search ${a.substring(9)}': CoopSearch(
           rounds: int.parse(a.substring(9)),
           person: allBots ? null : 0,
+          minPlayChance: minPlay,
+          rollout: args.contains('--rollout=person')
+              ? const QuickPersonPolicy().decide
+              : args.contains('--rollout=sharp')
+              ? const SharpCoopPolicy().decide
+              : null,
           random: Random(1),
         ).decide,
     for (final a in args)
       if (a.startsWith('--net='))
-        File(a.substring(6)).uri.pathSegments.last
-            .split('.')
-            .first: CoopNet(jsonDecode(File(a.substring(6)).readAsStringSync()))
-            .decide,
+        File(a.substring(6)).uri.pathSegments.last.split('.').first: CoopNet(
+          jsonDecode(File(a.substring(6)).readAsStringSync()),
+          minPlayChance: minPlay,
+        ).decide,
   };
   const person = CoopBot(player: ExpertPlayer.human);
   print(
     '$players players, $games games from seed $seed, '
     '${allBots ? 'all bots' : 'seat 0 = person model'}\n',
   );
-  print('bot            mean   gain  ±95%   hints to seat 0   ms/move');
+  print(
+    'bot            mean   gain  ±95%   hints to seat 0   ms/move  bot misfires',
+  );
   List<int>? base;
   for (final MapEntry(key: name, value: bot) in bots.entries) {
     final scores = <int>[];
-    var toYou = 0, moves = 0;
+    var toYou = 0, moves = 0, misfires = 0;
     final watch = Stopwatch()..start();
     for (var g = 0; g < games; g++) {
       final game = CoopGame(players: players, random: Random(seed + g));
@@ -66,7 +81,10 @@ void main(List<String> args) {
           moves++;
         }
         if (move is CoopHint && move.to == 0 && game.current != 0) toYou++;
+        final lives = game.errors;
+        final byBot = game.current != 0 || allBots;
         game.apply(move);
+        if (byBot && game.errors < lives) misfires++;
       }
       scores.add(game.score);
     }
@@ -80,7 +98,8 @@ void main(List<String> args) {
       '${(gain >= 0 ? '+' : '') + gain.toStringAsFixed(2)}  '
       '${(1.96 * sd / sqrt(games)).toStringAsFixed(2)}   '
       '${(toYou / games).toStringAsFixed(1).padLeft(10)}   '
-      '${(watch.elapsedMilliseconds / max(1, moves)).toStringAsFixed(1).padLeft(10)}',
+      '${(watch.elapsedMilliseconds / max(1, moves)).toStringAsFixed(1).padLeft(10)}'
+      '${(misfires / games).toStringAsFixed(2).padLeft(13)}',
     );
   }
 }

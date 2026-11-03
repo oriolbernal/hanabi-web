@@ -46,21 +46,28 @@ class _CoopScreenState extends State<CoopScreen> {
   }
 
   /// With three or four players, the network trained on the search
-  /// (rl/models/C5: 23.4 and 23.9 points against the rules' 22.5 and 22.7,
-  /// bin/coop_eval.dart). With two, where the person is the bots' only
-  /// partner, the search that imagines the person's way of playing (21.4
-  /// against 21.1); the network does not beat the rules there yet.
+  /// (rl/models/C5); with two, where the person is the bots' only partner,
+  /// the search that imagines the person's way of playing. Bots only try a
+  /// card that fits for sure or at least 80% likely, with a life to spare:
+  /// blind plays made 1.5 misfires a game. bin/coop_eval.dart, seat 0
+  /// played by the person model: 4 players 24.1 (rules 22.7), 2 players
+  /// 21.6 (rules 20.8), about 0.3 bot misfires a game.
   late final CoopMove Function(CoopGame) _decide = widget.players == 2
-      ? CoopSearch(rounds: 128, person: 0).decide
+      ? CoopSearch(rounds: 128, person: 0, minPlayChance: 0.8).decide
       : (CoopGame g) => _net?.decide(g) ?? _fallback.decide(g);
 
   static CoopNet? _net;
-  static final _fallback = CoopSearch(rounds: 128);
+  static final _fallback = CoopSearch(rounds: 128, minPlayChance: 0.8);
 
   /// Loads the network once; until it is there, the search plays.
   static final Future<void> _loading = rootBundle
       .loadString('assets/models/coop_policy.json')
-      .then((json) => _net = CoopNet(jsonDecode(json) as Map<String, dynamic>));
+      .then(
+        (json) => _net = CoopNet(
+          jsonDecode(json) as Map<String, dynamic>,
+          minPlayChance: 0.8,
+        ),
+      );
 
   @override
   void initState() {

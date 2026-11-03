@@ -7,9 +7,9 @@ import '../game/coop.dart';
 /// the search's values (`rl/coop_distill.py`) and plays the best one: about
 /// as good as the search, many times faster.
 class CoopNet {
-  CoopNet(Map<String, dynamic> weights)
+  CoopNet(Map<String, dynamic> weights, {double minPlayChance = 0.4})
     : _net = Mlp(weights),
-      _search = CoopSearch(rounds: 0) {
+      _search = CoopSearch(rounds: 0, minPlayChance: minPlayChance) {
     final version = weights['features'];
     if (version != CoopFeatures.version) {
       throw ArgumentError(

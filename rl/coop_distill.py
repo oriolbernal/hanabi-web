@@ -19,31 +19,45 @@ import torch
 from torch import nn
 
 
-def load(pattern: str):
-    states, cands, values = [], [], []
+def _lines(pattern: str):
     for path in sorted(glob.glob(pattern)):
         with open(path) as f:
             for line in f:
-                if not line.endswith("}\n"):
-                    continue  # still being written
-                d = json.loads(line)
-                states.append(np.array(d["s"].split(), dtype=np.float32))
-                cands.append([np.array(c.split(), dtype=np.float32) for c in d["c"]])
-                values.append(np.array(d["v"].split(), dtype=np.float32))
-    k = max(len(c) for c in cands)
-    m = len(cands[0][0])
-    n = len(states)
-    c = np.zeros((n, k, m), dtype=np.float32)
+                if line.endswith("}\n"):  # skip a line still being written
+                    yield line
+
+
+def load(pattern: str):
+    """Two passes, so the arrays are allocated once; candidates are kept in
+    float16 (the features are probabilities and small counts), which halves
+    the memory for a million moves."""
+    n = k = 0
+    s_size = m_size = 0
+    for line in _lines(pattern):
+        d = json.loads(line)
+        n += 1
+        k = max(k, len(d["c"]))
+        if not s_size:
+            s_size = len(d["s"].split())
+            m_size = len(d["c"][0].split())
+    states = np.zeros((n, s_size), dtype=np.float32)
+    c = np.zeros((n, k, m_size), dtype=np.float16)
     v = np.zeros((n, k), dtype=np.float32)
     mask = np.zeros((n, k), dtype=bool)
-    for i, (cs, vs) in enumerate(zip(cands, values)):
-        c[i, : len(cs)] = np.stack(cs)
+    for i, line in enumerate(_lines(pattern)):
+        if i >= n:
+            break
+        d = json.loads(line)
+        states[i] = np.array(d["s"].split(), dtype=np.float32)
+        for j, cand in enumerate(d["c"]):
+            c[i, j] = np.array(cand.split(), dtype=np.float32)
+        vs = np.array(d["v"].split(), dtype=np.float32)
         v[i, : len(vs)] = vs
-        mask[i, : len(cs)] = True
+        mask[i, : len(vs)] = True
     v = torch.tensor(v)
     mask = torch.tensor(mask)
     mean = (v * mask).sum(1, keepdim=True) / mask.sum(1, keepdim=True)
-    return torch.tensor(np.stack(states)), torch.tensor(c), mask, (v - mean) * mask
+    return torch.tensor(states), torch.tensor(c), mask, (v - mean) * mask
 
 
 class Scorer(nn.Module):
@@ -59,6 +73,7 @@ class Scorer(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, states, cands):
+        cands = cands.float()
         s = states[:, None, :].expand(-1, cands.shape[1], -1)
         return self.net(torch.cat([s, cands], dim=2))[..., 0]
 
@@ -69,7 +84,8 @@ def masked_mse(pred, target, mask):
 
 def report(net, s, c, mask, adv) -> str:
     with torch.no_grad():
-        pred = net(s, c)
+        # In chunks: the whole set at once would need gigabytes.
+        pred = torch.cat([net(s[i : i + 65536], c[i : i + 65536]) for i in range(0, len(s), 65536)])
         mse = masked_mse(pred, adv, mask).item()
         pick = pred.masked_fill(~mask, -1e9).argmax(1)
         best = adv.masked_fill(~mask, -1e9).max(1).values

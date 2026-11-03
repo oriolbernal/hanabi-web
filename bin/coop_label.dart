@@ -5,9 +5,12 @@
 // labelled, so the bots also learn to play next to someone like you.
 //
 //   dart run bin/coop_label.dart <from seed> <to seed> <rounds> <out.jsonl>
-//       [--net=model.json] [--rollout-net] [--players=2,3,4] [--person]
+//       [--net=model.json] [--rollout-net] [--rollout=person]
+//       [--players=2,3,4] [--person]
 //
-// --person puts the model of the person in seat 0 in every game.
+// --person puts the model of the person in seat 0 in every game;
+// --rollout=person plays every seat of the imagined games like the person
+// (a stronger search: 24.2 instead of 23.4 with four players).
 //
 // One JSON line per move: "s" the state features, "c" the features of each
 // candidate, "v" the search's value of each candidate.
@@ -50,7 +53,11 @@ void main(List<String> args) {
     rounds: rounds,
     random: random,
     person: withPerson ? 0 : null,
-    rollout: args.contains('--rollout-net') && net != null ? net.decide : null,
+    rollout: args.contains('--rollout=person')
+        ? const QuickPersonPolicy().decide
+        : args.contains('--rollout-net') && net != null
+        ? net.decide
+        : null,
   );
   const person = CoopBot(player: ExpertPlayer.human);
   var lines = 0, total = 0;
