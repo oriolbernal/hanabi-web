@@ -50,6 +50,76 @@ class CoopGame {
     }
   }
 
+  /// An independent copy, to imagine how the game goes on.
+  CoopGame.copy(CoopGame other)
+    : players = other.players,
+      _deck = [for (final c in other._deck) c.copy()],
+      fireworks = Fireworks.copy(other.fireworks),
+      hints = other.hints,
+      errors = other.errors,
+      current = other.current,
+      turnsLeft = other.turnsLeft {
+    for (final hand in other.hands) {
+      hands.add([for (final c in hand) c.copy()]);
+    }
+    discarded.addAll(other.discarded);
+  }
+
+  /// The game as [player] could imagine it: their own cards, which they
+  /// cannot see, drawn again from the cards they cannot see (deck and own
+  /// hand) so that every hint they got still holds, and the deck shuffled.
+  factory CoopGame.imagined(CoopGame other, int player, Random random) {
+    final game = CoopGame.copy(other);
+    final hand = game.hands[player];
+    final unseen = [...game._deck, ...hand]..shuffle(random);
+    bool fits(GameCard known, GameCard c) =>
+        (known.knownNumber
+            ? c.number == known.number
+            : !known.notNumbers.contains(c.number)) &&
+        (known.knownColor
+            ? c.color == known.color
+            : !known.notColors.contains(c.color));
+    // The most constrained cards pick first.
+    final order = [for (var i = 0; i < hand.length; i++) i]
+      ..sort(
+        (a, b) => unseen
+            .where((c) => fits(hand[a], c))
+            .length
+            .compareTo(unseen.where((c) => fits(hand[b], c)).length),
+      );
+    for (var attempt = 0; attempt < 20; attempt++) {
+      final pool = List.of(unseen);
+      final drawn = List<GameCard?>.filled(hand.length, null);
+      var ok = true;
+      for (final i in order) {
+        final j = pool.indexWhere((c) => fits(hand[i], c));
+        if (j < 0) {
+          ok = false;
+          break;
+        }
+        final c = pool.removeAt(j);
+        drawn[i] = GameCard(c.number, c.color)
+          ..knownNumber = hand[i].knownNumber
+          ..knownColor = hand[i].knownColor
+          ..notNumbers.addAll(hand[i].notNumbers)
+          ..notColors.addAll(hand[i].notColors);
+      }
+      if (ok) {
+        for (var i = 0; i < hand.length; i++) {
+          hand[i] = drawn[i]!;
+        }
+        game._deck
+          ..clear()
+          ..addAll(pool);
+        return game;
+      }
+      unseen.shuffle(random);
+    }
+    // Rarely nothing fits on the first tries: keep the real cards.
+    game._deck.shuffle(random);
+    return game;
+  }
+
   final int players;
   final List<GameCard> _deck;
   final List<List<GameCard>> hands = [];

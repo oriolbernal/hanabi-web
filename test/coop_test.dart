@@ -5,6 +5,7 @@ import 'package:hanabi/game/card.dart';
 import 'package:hanabi/game/coop.dart';
 import 'package:hanabi/game/game.dart';
 import 'package:hanabi/sim/coop_bot.dart';
+import 'package:hanabi/sim/coop_search.dart';
 import 'package:hanabi/sim/simulated_player.dart';
 
 void main() {
@@ -91,5 +92,49 @@ void main() {
     final move = const CoopBot().decide(game);
     expect(move, isA<CoopPlay>());
     expect((move as CoopPlay).target, CardColor.red);
+  });
+
+  test('an imagined deal keeps what the player knows and sees', () {
+    final game = CoopGame(players: 3, random: Random(11));
+    game.hint(1, NumberHint(game.hands[1][2].number)); // player 0 tells 1
+    game.hint(2, NumberHint(game.hands[2][0].number)); // player 1 tells 2
+    game.hint(1, ColorHint(game.hands[1][0].color)); // player 2 tells 1
+    final seen = [
+      for (final p in [0, 2]) game.hands[p].join(),
+    ];
+    String unseen(CoopGame g) =>
+        (CoopGame.copy(g).hands[1].map((c) => '$c').toList()..sort()).join();
+    for (var seed = 0; seed < 30; seed++) {
+      final imagined = CoopGame.imagined(game, 1, Random(seed));
+      expect([
+        for (final p in [0, 2]) imagined.hands[p].join(),
+      ], seen);
+      expect(imagined.deckSize, game.deckSize);
+      expect(unseen(imagined).length, unseen(game).length);
+      for (var i = 0; i < 5; i++) {
+        final real = game.hands[1][i], card = imagined.hands[1][i];
+        if (real.knownNumber) expect(card.number, real.number);
+        if (real.knownColor) expect(card.color, real.color);
+        expect(real.notNumbers.contains(card.number), isFalse);
+        expect(real.notColors.contains(card.color), isFalse);
+      }
+    }
+  });
+
+  test('searching bots finish games with legal moves', () {
+    final search = CoopSearch(rounds: 8, random: Random(1));
+    for (var g = 0; g < 4; g++) {
+      final game = CoopGame(players: 2 + g % 3, random: Random(200 + g));
+      while (!game.isOver) {
+        final move = search.decide(game);
+        if (move case CoopHint(:final to)) expect(to, isNot(game.current));
+        if (move case CoopPlay(:final index, :final target)
+            when game.needsTarget(index)) {
+          expect(target, isNotNull);
+        }
+        game.apply(move);
+      }
+      expect(game.score, greaterThan(5));
+    }
   });
 }

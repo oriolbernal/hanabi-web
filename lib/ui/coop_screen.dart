@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../game/card.dart';
 import '../game/coop.dart';
 import '../game/game.dart';
-import '../sim/coop_bot.dart';
+import '../sim/coop_search.dart';
 import 'card_view.dart';
 import 'game_screen.dart';
 import 'move_log.dart';
@@ -42,7 +42,9 @@ class _CoopScreenState extends State<CoopScreen> {
     return CoopGame(players: widget.players, deck: List.of(deck));
   }
 
-  static const _bot = CoopBot();
+  /// Each bot imagines the rest of the game 128 times per candidate move
+  /// (bin/coop_search_bench.dart: +0.9 points with four players).
+  final _bot = CoopSearch(rounds: 128);
 
   /// Pause before each bot moves, so you can follow what happens.
   static const _botDelay = Duration(milliseconds: 1100);
@@ -118,7 +120,9 @@ class _CoopScreenState extends State<CoopScreen> {
       setState(() {});
       await Future<void>.delayed(_botDelay);
       if (!mounted || round != _round) return;
-      setState(() => _apply(_bot.decide(_game)));
+      // About 0.1 s on a laptop browser.
+      final move = _bot.decide(_game);
+      setState(() => _apply(move));
     }
     if (_game.isOver) await _showEnd();
   }

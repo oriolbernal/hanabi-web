@@ -34,8 +34,14 @@ class ExpertHints extends HintStrategy {
   Hint? choose(Game game) => bestHint(game)?.$1;
 
   (Hint, HintReason)? bestHint(Game game) {
-    (Hint, HintReason)? best;
-    var bestValue = double.negativeInfinity;
+    final ranked = rankHints(game);
+    return ranked.isEmpty ? null : (ranked.first.$1, ranked.first.$2);
+  }
+
+  /// Every useful hint with its reason and value, best first (ties keep
+  /// the order of [Game.usefulHints]).
+  List<(Hint, HintReason, double)> rankHints(Game game) {
+    final result = <(Hint, HintReason, double)>[];
     final before = PlayerView(game);
     final fits = game.fireworks.playableCards();
     for (final hint in game.usefulHints) {
@@ -72,19 +78,22 @@ class ExpertHints extends HintStrategy {
           50 * chance -
           300.0 * misleading +
           10 * info;
-      if (value > bestValue) {
-        bestValue = value;
-        final reason = surePlays > 0
-            ? HintReason.surePlay
-            : protects > 0
-            ? HintReason.protect
-            : useless > 0
-            ? HintReason.useless
-            : HintReason.info;
-        best = (hint, reason);
-      }
+      final reason = surePlays > 0
+          ? HintReason.surePlay
+          : protects > 0
+          ? HintReason.protect
+          : useless > 0
+          ? HintReason.useless
+          : HintReason.info;
+      result.add((hint, reason, value));
     }
-    return best;
+    // A stable sort, so equal values keep their order as before.
+    final indexed = [for (var i = 0; i < result.length; i++) (i, result[i])];
+    indexed.sort((a, b) {
+      final c = b.$2.$3.compareTo(a.$2.$3);
+      return c != 0 ? c : a.$1.compareTo(b.$1);
+    });
+    return [for (final e in indexed) e.$2];
   }
 
   /// Losing this card would cost points or a joker's protection.

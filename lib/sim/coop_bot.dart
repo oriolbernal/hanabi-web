@@ -24,7 +24,21 @@ class CoopBot {
     this.player = ExpertPlayer.tuned,
     this.person = 0,
     this.personPlayer = ExpertPlayer.human,
+    this.idleFirst = false,
+    this.minValue = double.negativeInfinity,
+    this.idleBonus = 0,
   });
+
+  /// A sure-play hint goes first to someone with nothing sure to play yet;
+  /// a player who already has one can wait.
+  final bool idleFirst;
+
+  /// A hint that brings no sure play and protects nothing is only worth a
+  /// token if [ExpertHints] values it at least this much (plus
+  /// [idleBonus] for a player with nothing sure to do); otherwise the bot
+  /// discards to win a token back.
+  final double minValue;
+  final double idleBonus;
 
   final ExpertPlayer player;
 
@@ -55,7 +69,9 @@ class CoopBot {
     switch (decision.reason) {
       case MoveReason.askHint:
         final hint = _bestHint(game, me);
-        if (hint != null) return hint;
+        if (hint != null && (game.hints == maxHints || _worth(game, hint))) {
+          return hint;
+        }
         // Nothing worth telling: decide as if no hint were left.
         return _toMove(game, player.decideWithReason(view..hints = 0));
       default:
@@ -70,8 +86,25 @@ class CoopBot {
 
   ExpertPlayer _model(int seat) => seat == person ? personPlayer : player;
 
+  /// Whether [p] has nothing they can surely play or discard.
+  static bool _idle(CoopGame game, int p) {
+    final view = PlayerView(game.viewFor(p));
+    for (var i = 0; i < game.hands[p].length; i++) {
+      if (view.surelyPlayable(i)) return false;
+    }
+    return true;
+  }
+
   CoopMove? _surePlayHint(CoopGame game, int me) {
-    for (final p in _others(game, me)) {
+    var order = _others(game, me).toList();
+    if (idleFirst) {
+      final idle = {for (final p in order) p: _idle(game, p)};
+      order = [
+        ...order.where((p) => idle[p]!),
+        ...order.where((p) => !idle[p]!),
+      ];
+    }
+    for (final p in order) {
       final best = _hints.bestHint(game.viewFor(p));
       if (best != null && best.$2 == HintReason.surePlay) {
         return CoopHint(p, best.$1);
@@ -99,19 +132,29 @@ class CoopBot {
     return null;
   }
 
-  /// The most useful hint for anyone: by [HintReason], then whoever plays
+  /// The most useful hint for anyone, by [ExpertHints]' value (plus
+  /// [idleBonus] for a player with nothing sure to do), then whoever plays
   /// soonest.
-  CoopMove? _bestHint(CoopGame game, int me) {
+  CoopHint? _bestHint(CoopGame game, int me) {
     CoopHint? best;
-    var bestReason = HintReason.values.length;
+    var bestValue = double.negativeInfinity;
     for (final p in _others(game, me)) {
-      final hint = _hints.bestHint(game.viewFor(p));
-      if (hint != null && hint.$2.index < bestReason) {
-        best = CoopHint(p, hint.$1);
-        bestReason = hint.$2.index;
+      final ranked = _hints.rankHints(game.viewFor(p));
+      if (ranked.isEmpty) continue;
+      final value = ranked.first.$3 + (_idle(game, p) ? idleBonus : 0);
+      if (value > bestValue) {
+        best = CoopHint(p, ranked.first.$1);
+        bestValue = value;
       }
     }
     return best;
+  }
+
+  bool _worth(CoopGame game, CoopHint hint) {
+    if (minValue == double.negativeInfinity) return true;
+    final ranked = _hints.rankHints(game.viewFor(hint.to));
+    final value = ranked.firstWhere((r) => r.$1 == hint.hint).$3;
+    return value + (_idle(game, hint.to) ? idleBonus : 0) >= minValue;
   }
 
   CoopMove _toMove(CoopGame game, ExpertDecision decision) {
