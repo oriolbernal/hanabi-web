@@ -724,9 +724,12 @@ class PileView extends StatelessWidget {
 }
 
 class DiscardsView extends StatelessWidget {
-  const DiscardsView({super.key, required this.cards});
+  const DiscardsView({super.key, required this.cards, this.scrolls = true});
 
   final List<GameCard> cards;
+
+  /// False when it sits inside something that already scrolls.
+  final bool scrolls;
 
   @override
   Widget build(BuildContext context) {
@@ -739,30 +742,29 @@ class DiscardsView extends StatelessWidget {
         ),
       );
     }
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final color in CardColor.values)
-            if (cards.any((c) => c.color == color))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Wrap(
-                  spacing: 0,
-                  runSpacing: 0,
-                  children: [
-                    for (final c
-                        in cards.where((c) => c.color == color).toList()
-                          ..sort((a, b) => a.number.compareTo(b.number)))
-                      MiniCard(card: c, highlighted: identical(c, cards.last)),
-                  ],
-                ),
+    final rows = Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final color in CardColor.values)
+          if (cards.any((c) => c.color == color))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Wrap(
+                spacing: 0,
+                runSpacing: 0,
+                children: [
+                  for (final c
+                      in cards.where((c) => c.color == color).toList()
+                        ..sort((a, b) => a.number.compareTo(b.number)))
+                    MiniCard(card: c, highlighted: identical(c, cards.last)),
+                ],
               ),
-        ],
-      ),
+            ),
+      ],
     );
+    return scrolls ? SingleChildScrollView(child: rows) : rows;
   }
 }
 

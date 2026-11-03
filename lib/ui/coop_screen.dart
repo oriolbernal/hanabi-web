@@ -297,7 +297,9 @@ class _CoopScreenState extends State<CoopScreen> {
     final possible = Settings.devMode.value
         ? possibleCards(_game.viewFor(0))
         : null;
-    return Column(
+    // The table scrolls when it does not fit; your hand, what just
+    // happened and the buttons stay put below it.
+    final table = Column(
       children: [
         StatusBar(
           hints: _game.hints,
@@ -331,12 +333,16 @@ class _CoopScreenState extends State<CoopScreen> {
         for (var p = 1; p < _game.players; p++) _partner(p, partnerWidth),
         const SizedBox(height: 6),
         _sectionLabel(tr.discards),
-        Expanded(
-          child: SizedBox(
-            width: double.infinity,
-            child: DiscardsView(cards: _game.discarded),
-          ),
+        SizedBox(
+          width: double.infinity,
+          child: DiscardsView(cards: _game.discarded, scrolls: false),
         ),
+        const SizedBox(height: 8),
+      ],
+    );
+    return Column(
+      children: [
+        Expanded(child: SingleChildScrollView(child: table)),
         const SizedBox(height: 8),
         _messageBar(),
         const SizedBox(height: 10),
