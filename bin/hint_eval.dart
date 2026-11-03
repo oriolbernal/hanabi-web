@@ -37,10 +37,13 @@ void main(List<String> args) {
       if (a.startsWith('--margin='))
         ...a.substring('--margin='.length).split(',').map(double.parse),
   ];
-  final chance = [
-    for (final a in args)
-      if (a.startsWith('--chance=')) double.parse(a.substring('--chance='.length)),
-  ].firstOrNull ?? 0.5;
+  final chance =
+      [
+        for (final a in args)
+          if (a.startsWith('--chance='))
+            double.parse(a.substring('--chance='.length)),
+      ].firstOrNull ??
+      0.5;
   final strategies = <HintStrategy>[
     for (final a in args)
       if (a.startsWith('--model=')) ...[
@@ -72,8 +75,9 @@ void main(List<String> args) {
     for (var i = 0; i < games; i++) playGame(s, player, seed + i),
   ];
   String legible(Counting c) =>
-      ' ${(100 * c.firstTaken / c.firstPossible).toStringAsFixed(0)}%'
-              .padLeft(5) +
+      ' ${(100 * c.firstTaken / c.firstPossible).toStringAsFixed(0)}%'.padLeft(
+        5,
+      ) +
       ' ${(100 * c.taken / c.possible).toStringAsFixed(0)}%'.padLeft(5);
   String actionable(List<GameResult> results) {
     final given = results.fold(0, (n, r) => n + r.hints.given);

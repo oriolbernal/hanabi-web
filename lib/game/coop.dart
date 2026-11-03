@@ -35,8 +35,9 @@ class CoopHint extends CoopMove {
 /// included), hint tokens, lives and five cards in every hand. Nobody sees their own hand, everyone
 /// sees the others'. On a turn a player plays a card, discards one (winning
 /// a hint token back) or spends a token to tell another player which of
-/// their cards have one number or one color. When the deck runs out, every
-/// player has one last turn.
+/// their cards have one number or one color. When the deck runs out, play
+/// goes on, as in the solitaire, until every hand is empty; a player with
+/// no cards left is skipped.
 class CoopGame {
   CoopGame({required this.players, Random? random, List<GameCard>? deck})
     : assert(players >= 2 && players <= maxPlayers),
@@ -57,8 +58,7 @@ class CoopGame {
       fireworks = Fireworks.copy(other.fireworks),
       hints = other.hints,
       errors = other.errors,
-      current = other.current,
-      turnsLeft = other.turnsLeft {
+      current = other.current {
     for (final hand in other.hands) {
       hands.add([for (final c in hand) c.copy()]);
     }
@@ -131,15 +131,13 @@ class CoopGame {
   /// Whose turn it is; player 0 is the person.
   int current = 0;
 
-  /// Turns left once the deck is empty, or null while it still has cards.
-  int? turnsLeft;
-
   /// Cards per hand: five, whatever the number of players.
   int get handSize => 5;
 
   int get deckSize => _deck.length;
   int get score => fireworks.score;
-  bool get isOver => fireworks.victory || errors == 0 || turnsLeft == 0;
+  bool get isOver =>
+      fireworks.victory || errors == 0 || hands.every((h) => h.isEmpty);
 
   /// Whether playing the card at [index] of the current hand needs a pile.
   bool needsTarget(int index) {
@@ -244,13 +242,9 @@ class CoopGame {
   }
 
   void _endTurn() {
-    if (turnsLeft != null) {
-      turnsLeft = turnsLeft! - 1;
-    } else if (_deck.isEmpty) {
-      // The turn that drew the last card is over: everyone, including
-      // whoever drew it, plays once more.
-      turnsLeft = players;
-    }
-    current = (current + 1) % players;
+    if (isOver) return;
+    do {
+      current = (current + 1) % players;
+    } while (hands[current].isEmpty);
   }
 }

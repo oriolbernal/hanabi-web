@@ -21,6 +21,37 @@ enum HintReason {
   info,
 }
 
+/// What a hint would do, as [ExpertHints] judges it.
+class HintScore {
+  const HintScore({
+    required this.hint,
+    required this.reason,
+    required this.value,
+    required this.surePlays,
+    required this.protects,
+    required this.useless,
+    required this.misleading,
+    required this.touched,
+    required this.chance,
+    required this.info,
+  });
+
+  final Hint hint;
+  final HintReason reason;
+  final double value;
+
+  /// Cards that become sure plays, cards that must be kept and get touched,
+  /// cards that become sure discards, cards that now look playable but are
+  /// not, and cards the hint tells something new about.
+  final int surePlays, protects, useless, misleading, touched;
+
+  /// Best chance of playing a card that really fits, after the hint.
+  final double chance;
+
+  /// Share of the possibilities ruled out, summed over the hand.
+  final double info;
+}
+
 /// Hints chosen by explicit rules a person can follow. It sees the real
 /// cards, as the hint giver does, and judges each hint by what the player
 /// will know after it.
@@ -40,14 +71,20 @@ class ExpertHints extends HintStrategy {
 
   /// Every useful hint with its reason and value, best first (ties keep
   /// the order of [Game.usefulHints]).
-  List<(Hint, HintReason, double)> rankHints(Game game) {
-    final result = <(Hint, HintReason, double)>[];
+  List<(Hint, HintReason, double)> rankHints(Game game) => [
+    for (final s in scoreHints(game)) (s.hint, s.reason, s.value),
+  ];
+
+  /// Like [rankHints], with what each hint does in detail.
+  List<HintScore> scoreHints(Game game) {
+    final result = <HintScore>[];
     final before = PlayerView(game);
     final fits = game.fireworks.playableCards();
     for (final hint in game.usefulHints) {
       final g = Game.copy(game)..applyHint(hint);
       final after = PlayerView(g);
       var surePlays = 0, protects = 0, useless = 0, misleading = 0;
+      var touchedCards = 0;
       var chance = 0.0, info = 0.0;
       for (var i = 0; i < g.hand.length; i++) {
         final card = g.hand[i];
@@ -62,6 +99,7 @@ class ExpertHints extends HintStrategy {
         final touched =
             !old.knownNumber && card.knownNumber ||
             !old.knownColor && card.knownColor;
+        if (touched) touchedCards++;
         if (touched &&
             !(old.knownNumber || old.knownColor) &&
             _mustKeep(game, card)) {
@@ -85,12 +123,25 @@ class ExpertHints extends HintStrategy {
           : useless > 0
           ? HintReason.useless
           : HintReason.info;
-      result.add((hint, reason, value));
+      result.add(
+        HintScore(
+          hint: hint,
+          reason: reason,
+          value: value,
+          surePlays: surePlays,
+          protects: protects,
+          useless: useless,
+          misleading: misleading,
+          touched: touchedCards,
+          chance: chance,
+          info: info,
+        ),
+      );
     }
     // A stable sort, so equal values keep their order as before.
     final indexed = [for (var i = 0; i < result.length; i++) (i, result[i])];
     indexed.sort((a, b) {
-      final c = b.$2.$3.compareTo(a.$2.$3);
+      final c = b.$2.value.compareTo(a.$2.value);
       return c != 0 ? c : a.$1.compareTo(b.$1);
     });
     return [for (final e in indexed) e.$2];

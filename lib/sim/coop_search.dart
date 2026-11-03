@@ -79,20 +79,34 @@ class CoopSearch {
   CoopSearch({
     this.rounds = 24,
     this.base = const CoopBot(),
-    this.rollout = const QuickCoopPolicy(),
+    CoopMove Function(CoopGame)? rollout,
     Random? random,
-  }) : _random = random ?? Random();
+  }) : rollout = rollout ?? const QuickCoopPolicy().decide,
+       _random = random ?? Random();
 
   final int rounds;
   final CoopBot base;
-  final QuickCoopPolicy rollout;
+
+  /// Plays the imagined games: the quick policy, or a trained network.
+  final CoopMove Function(CoopGame) rollout;
   final Random _random;
 
   static const _hints = ExpertHints();
 
   CoopMove decide(CoopGame game) {
+    final scored = evaluate(game);
+    var best = 0;
+    for (var m = 1; m < scored.length; m++) {
+      if (scored[m].$2 > scored[best].$2) best = m;
+    }
+    return withTarget(game, scored[best].$1);
+  }
+
+  /// Each candidate move with its average final score over the imagined
+  /// games (all the same score when there is a single candidate).
+  List<(CoopMove, double)> evaluate(CoopGame game) {
     final options = candidates(game);
-    if (options.length == 1) return _withTarget(game, options.single);
+    if (options.length == 1) return [(options.single, 0)];
     final totals = List.filled(options.length, 0.0);
     for (var r = 0; r < rounds; r++) {
       final world = CoopGame.imagined(game, game.current, _random);
@@ -101,15 +115,13 @@ class CoopSearch {
         totals[m] += _playOut(world, options[m], seed);
       }
     }
-    var best = 0;
-    for (var m = 1; m < options.length; m++) {
-      if (totals[m] > totals[best]) best = m;
-    }
-    return _withTarget(game, options[best]);
+    return [
+      for (var m = 0; m < options.length; m++) (options[m], totals[m] / rounds),
+    ];
   }
 
   /// A joker of 2-5 needs a pile: the one that keeps the most points open.
-  static CoopMove _withTarget(CoopGame game, CoopMove move) {
+  static CoopMove withTarget(CoopGame game, CoopMove move) {
     if (move case CoopPlay(:final index, target: null)
         when game.needsTarget(index)) {
       return CoopPlay(
@@ -140,7 +152,7 @@ class CoopSearch {
     final random = Random(seed);
     var turns = 0;
     while (!g.isOver && turns++ < 200) {
-      final m = rollout.decide(g);
+      final m = rollout(g);
       if (m case CoopPlay(:final index) when g.needsTarget(index)) {
         final c = g.hands[g.current][index];
         final fits = [

@@ -312,14 +312,6 @@ class _CoopScreenState extends State<CoopScreen> {
           score: _game.score,
           max: _game.maxScore(),
         ),
-        if (_game.turnsLeft case final left? when !_game.isOver)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              tr.lastRound(left),
-              style: const TextStyle(color: accent, fontSize: 13),
-            ),
-          ),
         const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

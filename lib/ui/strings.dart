@@ -99,7 +99,6 @@ abstract class Strings {
   String botThinking(String name);
   String get tapCardCoop;
   String get noHintTokens;
-  String lastRound(int turns);
   String cardName(GameCard c) => '${c.number} ${colorName(c.color)}';
   String playedBy(String? name, GameCard c, {required bool fits});
   String discardedBy(String? name, GameCard c);
@@ -272,9 +271,6 @@ class _English extends Strings {
       'to give them a hint';
   @override
   String get noHintTokens => 'No hint tokens left: discard to win one back';
-  @override
-  String lastRound(int turns) =>
-      'Last round: $turns ${turns == 1 ? 'turn' : 'turns'} left';
   @override
   String playedBy(String? name, GameCard c, {required bool fits}) => fits
       ? '${name ?? 'You'} played a ${cardName(c)}.'
@@ -520,9 +516,6 @@ class _Catalan extends Strings {
   @override
   String get noHintTokens =>
       "No queden pistes: descarta una carta per recuperar-ne una";
-  @override
-  String lastRound(int turns) =>
-      'Última ronda: ${turns == 1 ? 'queda 1 torn' : 'queden $turns torns'}';
   @override
   String playedBy(String? name, GameCard c, {required bool fits}) => fits
       ? (name == null
@@ -775,9 +768,6 @@ class _Spanish extends Strings {
   @override
   String get noHintTokens =>
       'No quedan pistas: descarta una carta para recuperar una';
-  @override
-  String lastRound(int turns) =>
-      'Última ronda: ${turns == 1 ? 'queda 1 turno' : 'quedan $turns turnos'}';
   @override
   String playedBy(String? name, GameCard c, {required bool fits}) => fits
       ? (name == null

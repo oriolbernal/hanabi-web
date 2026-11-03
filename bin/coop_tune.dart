@@ -36,15 +36,19 @@ final configs = <String, CoopBot>{
 void main(List<String> args) {
   final games = args.isNotEmpty ? int.parse(args[0]) : 200;
   for (final players in [4, 3, 2]) {
-    print('\n$players players, $games games'
-        '              all bots   with you: score  hints to you / each bot');
+    print(
+      '\n$players players, $games games'
+      '              all bots   with you: score  hints to you / each bot',
+    );
     for (final MapEntry(key: name, value: bot) in configs.entries) {
       final (botScore, _) = run(bot, bot, players, games);
       final (score, per) = run(bot, person, players, games);
       final others = [for (var p = 1; p < players; p++) per[p]];
-      print('${name.padRight(30)} ${botScore.toStringAsFixed(2)}'
-          '      ${score.toStringAsFixed(2)}  ${per[0].toStringAsFixed(1)} / '
-          '${(others.reduce((a, b) => a + b) / others.length).toStringAsFixed(1)}');
+      print(
+        '${name.padRight(30)} ${botScore.toStringAsFixed(2)}'
+        '      ${score.toStringAsFixed(2)}  ${per[0].toStringAsFixed(1)} / '
+        '${(others.reduce((a, b) => a + b) / others.length).toStringAsFixed(1)}',
+      );
     }
   }
 }

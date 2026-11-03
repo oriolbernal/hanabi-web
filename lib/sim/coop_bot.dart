@@ -116,7 +116,7 @@ class CoopBot {
   /// If player [next] would discard a card that must be kept, a hint
   /// touching it (its number if unknown, else its color).
   CoopMove? _protectHint(CoopGame game, int next) {
-    if (next == game.current) return null;
+    if (next == game.current || game.hands[next].isEmpty) return null;
     final view = game.viewFor(next);
     final move = _model(next).decide(view);
     if (move is! DiscardMove) return null;

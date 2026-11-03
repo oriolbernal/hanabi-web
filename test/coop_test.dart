@@ -42,21 +42,43 @@ void main() {
     expect(pv.candidates(0), isNotEmpty);
   });
 
-  test('when the deck runs out, everyone plays once more', () {
+  test('when the deck runs out, play goes on until every hand is empty', () {
     final game = CoopGame(players: 3, random: Random(4));
     while (game.deckSize > 0) {
       game.discard(0);
     }
-    final last = (game.current + 2) % 3; // who drew the last card
-    expect(game.turnsLeft, 3);
     expect(game.isOver, isFalse);
-    final seen = <int>[];
+    var turns = 0;
     while (!game.isOver) {
-      seen.add(game.current);
+      expect(game.hands[game.current], isNotEmpty);
+      game.discard(0);
+      turns++;
+    }
+    expect(turns, 15);
+    expect(game.hands.every((h) => h.isEmpty), isTrue);
+  });
+
+  test('a player with no cards left is skipped', () {
+    final game = CoopGame(players: 2, random: Random(6));
+    while (game.deckSize > 0) {
       game.discard(0);
     }
-    expect(seen.length, 3);
-    expect(seen.last, last);
+    while (game.hands[0].isNotEmpty) {
+      if (game.current == 0) {
+        game.discard(0);
+      } else {
+        game.hint(
+          0,
+          game.hintsFor(0).isEmpty
+              ? NumberHint(game.hands[0].first.number)
+              : game.hintsFor(0).first,
+        );
+      }
+      if (game.hints == 0) game.hints = 5;
+    }
+    expect(game.current, 1);
+    game.discard(0);
+    expect(game.current, 1);
   });
 
   test('bots finish their games with a sensible score', () {
