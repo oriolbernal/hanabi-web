@@ -45,12 +45,12 @@ class _CoopScreenState extends State<CoopScreen> {
     return CoopGame(players: widget.players, deck: List.of(deck));
   }
 
-  /// The network trained on the search (rl/models/C8: 512x512, on every
-  /// round of data taught by the search that imagines the person's way of
-  /// playing). Bots only try a card that fits for sure or at least 80%
-  /// likely, with a life to spare: blind plays made 1.5 misfires a game.
+  /// The network trained on the search (rl/models/D10: 512x512, features
+  /// c2, which see every card in the other hands; two rounds of data taught
+  /// by the search). Bots only try a card that fits for sure or at least
+  /// 80% likely, with a life to spare: blind plays made 1.5 misfires a game.
   /// bin/coop_eval.dart, seat 0 played by the person model, 300 games:
-  /// 2 players 21.6 (rules 21.1), 3 players 23.9 (22.5), 4 players 24.3
+  /// 2 players 22.0 (rules 21.1), 3 players 24.1 (22.5), 4 players 24.4
   /// (22.7), about 0.3 bot misfires a game. Until it has loaded, the search
   /// plays.
   CoopMove _decide(CoopGame g) => _net?.decide(g) ?? _fallback.decide(g);
