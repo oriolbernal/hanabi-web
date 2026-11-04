@@ -10,18 +10,31 @@ import 'smart_strategies.dart';
 /// their own hand through the hints, the table and the other hands.
 ///
 /// [state] describes the position, [move] one candidate move; the network
-/// reads both, one candidate at a time. Change [version] when either
-/// changes, so old data and models are not mixed up.
+/// reads both, one candidate at a time. Add a [version] when either
+/// changes, so old data and models are not mixed up: c1 summarises the
+/// other hands, c2 adds every card in them and which ones a hint touches.
 class CoopFeatures {
-  CoopFeatures(this.game)
+  CoopFeatures(this.game, {this.version = latest})
     : me = game.current,
       view = game.viewFor(game.current) {
+    if (!versions.contains(version)) {
+      throw ArgumentError('unknown co-op features $version');
+    }
     pv = PlayerView(view);
   }
 
-  static const version = 'c1';
-  static const stateSize = 14 + 5 * 8 + 3 * 4;
-  static const moveSize = 3 + 5 + 5 + 3 + 1 + 8;
+  static const versions = ['c1', 'c2'];
+  static const latest = 'c2';
+
+  /// Per card in another player's hand (c2).
+  static const _cardSize = 13;
+
+  static int stateSize(String version) =>
+      14 + 5 * 8 + 3 * 4 + (version == 'c1' ? 0 : 3 * 5 * _cardSize);
+  static int moveSize(String version) =>
+      3 + 5 + 5 + 3 + 1 + 8 + (version == 'c1' ? 0 : 10);
+
+  final String version;
 
   final CoopGame game;
   final int me;
@@ -34,14 +47,17 @@ class CoopFeatures {
   final Map<int, Game> _views = {};
   final Map<int, List<HintScore>> _scores = {};
   final Map<int, bool> _idle = {};
+  final Map<int, PlayerView> _pvs = {};
 
   Game viewOf(int p) => _views.putIfAbsent(p, () => game.viewFor(p));
+  PlayerView playerViewOf(int p) =>
+      _pvs.putIfAbsent(p, () => PlayerView(viewOf(p)));
   List<HintScore> scoresOf(int p) =>
       _scores.putIfAbsent(p, () => _hints.scoreHints(viewOf(p)));
 
   /// Whether [p] has nothing they can surely play.
   bool idle(int p) => _idle.putIfAbsent(p, () {
-    final v = PlayerView(viewOf(p));
+    final v = playerViewOf(p);
     for (var i = 0; i < game.hands[p].length; i++) {
       if (v.surelyPlayable(i)) return false;
     }
@@ -52,6 +68,71 @@ class CoopFeatures {
   int distance(int p) => (p - me + game.players) % game.players;
 
   int chop() => view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
+
+  static int _chopOf(List<GameCard> hand) =>
+      hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
+
+  late final List<GameCard> _playable = game.fireworks.playableCards();
+
+  bool _isPlayable(GameCard c) => _playable.any(c.sameAs);
+
+  /// Can never be played: its pile (every pile, for a joker) is past it.
+  bool _isDead(GameCard c) {
+    final f = game.fireworks;
+    final piles = c.isJoker ? CardColor.piles : [c.color];
+    return piles.every((p) => (f.top(p)?.number ?? 0) >= c.number);
+  }
+
+  /// Cards still needed before [c] fits, 0 when it is playable.
+  int _gap(GameCard c) {
+    final f = game.fireworks;
+    final piles = c.isJoker ? CardColor.piles : [c.color];
+    return piles
+        .map((p) => c.number - (f.top(p)?.number ?? 0) - 1)
+        .where((g) => g >= 0)
+        .fold(4, (a, b) => a < b ? a : b);
+  }
+
+  /// Every card in the other players' hands, in turn order (c2).
+  List<double> _cards() {
+    final out = <double>[];
+    for (var k = 1; k <= 3; k++) {
+      final p = (me + k) % game.players;
+      final hand = k < game.players ? game.hands[p] : const <GameCard>[];
+      final chop = _chopOf(hand);
+      for (var i = 0; i < 5; i++) {
+        if (i >= hand.length) {
+          out.addAll(List.filled(_cardSize, 0));
+          continue;
+        }
+        final c = hand[i];
+        final theirs = playerViewOf(p);
+        var twins = 0;
+        for (var q = 0; q < game.players; q++) {
+          if (q == me) continue;
+          for (final d in game.hands[q]) {
+            if (!identical(d, c) && d.sameAs(c)) twins++;
+          }
+        }
+        out.addAll([
+          1,
+          _isPlayable(c) ? 1 : 0,
+          _isDead(c) ? 1 : 0,
+          LookaheadStrategy.isCritical(viewOf(p), c) ? 1 : 0,
+          c.number / 5,
+          _gap(c) / 4,
+          c.isJoker ? 1 : 0,
+          c.knownNumber ? 1 : 0,
+          c.knownColor ? 1 : 0,
+          theirs.playProbability(i),
+          theirs.surelyPlayable(i) ? 1 : 0,
+          i == chop ? 1 : 0,
+          twins > 0 ? 1 : 0,
+        ]);
+      }
+    }
+    return out;
+  }
 
   late final List<double> state = _state();
 
@@ -107,12 +188,13 @@ class CoopFeatures {
         hand.where((c) => c.knownNumber || c.knownColor).length / 5,
       ]);
     }
-    assert(out.length == stateSize);
+    if (version != 'c1') out.addAll(_cards());
+    assert(out.length == stateSize(version));
     return out;
   }
 
   List<double> move(CoopMove m) {
-    final out = List<double>.filled(moveSize, 0);
+    final out = List<double>.filled(moveSize(version), 0);
     switch (m) {
       case CoopPlay(:final index) || CoopDiscard(:final index):
         out[m is CoopPlay ? 0 : 1] = 1;
@@ -136,6 +218,27 @@ class CoopFeatures {
         out[22] = s.chance;
         out[23] = s.info / 5;
         out[24] = idle(to) ? 1 : 0;
+        if (version != 'c1') {
+          // Which cards it touches, and what they really are.
+          final hand = game.hands[to];
+          final chop = _chopOf(hand);
+          for (var i = 0; i < hand.length; i++) {
+            final c = hand[i];
+            final touches = switch (hint) {
+              NumberHint(:final number) => c.number == number,
+              ColorHint(:final color) => c.color == color,
+            };
+            if (!touches) continue;
+            out[25 + i] = 1;
+            if (_isPlayable(c)) out[30] += 0.2;
+            if (_isDead(c)) out[31] += 0.2;
+            if (LookaheadStrategy.isCritical(viewOf(to), c)) out[32] += 0.2;
+            if (i == chop) out[33] = 1;
+            if (hint is NumberHint ? !c.knownNumber : !c.knownColor) {
+              out[34] += 0.2;
+            }
+          }
+        }
     }
     return out;
   }

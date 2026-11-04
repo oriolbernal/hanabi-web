@@ -107,7 +107,7 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-5)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--features", default="c1")
+    p.add_argument("--features", default="c2")
     args = p.parse_args()
     torch.manual_seed(args.seed)
 

@@ -9,17 +9,17 @@ import '../game/coop.dart';
 class CoopNet {
   CoopNet(Map<String, dynamic> weights, {double minPlayChance = 0.4})
     : _net = Mlp(weights),
-      _search = CoopSearch(rounds: 0, minPlayChance: minPlayChance) {
-    final version = weights['features'];
-    if (version != CoopFeatures.version) {
-      throw ArgumentError(
-        'model for features $version, '
-        'not ${CoopFeatures.version}',
-      );
+      _search = CoopSearch(rounds: 0, minPlayChance: minPlayChance),
+      _version = weights['features'] as String {
+    if (!CoopFeatures.versions.contains(_version)) {
+      throw ArgumentError('model for unknown features $_version');
     }
   }
 
   final Mlp _net;
+
+  /// The features the model was trained on.
+  final String _version;
 
   /// Only used for its list of candidate moves.
   final CoopSearch _search;
@@ -29,7 +29,7 @@ class CoopNet {
     if (options.length == 1) {
       return CoopSearch.withTarget(game, options.single);
     }
-    final f = CoopFeatures(game);
+    final f = CoopFeatures(game, version: _version);
     var best = options.first;
     var bestScore = double.negativeInfinity;
     for (final m in options) {
