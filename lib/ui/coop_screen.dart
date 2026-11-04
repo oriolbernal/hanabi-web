@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../game/coop.dart';
 import '../game/game.dart';
 import '../sim/coop_net.dart';
 import '../sim/coop_search.dart';
+import '../net/online.dart';
 import 'card_view.dart';
 import 'game_screen.dart';
 import 'move_log.dart';
@@ -15,16 +17,20 @@ import 'palette.dart';
 import 'settings.dart';
 import 'strings.dart';
 
-/// The bots' names, one per seat after yours.
-const botNames = ['Aiko', 'Ren', 'Sora'];
-
-/// A cooperative game: you (player 0) and [players] - 1 bots take turns.
-/// You see their cards but not yours; tap your card to play or discard it,
-/// or a partner's card to hint its number or color.
+/// A cooperative game. Offline, you (player 0) and [players] - 1 bots take
+/// turns. Online, [host] or [guest] connects the table: the host's phone
+/// deals, checks every move and plays the bots; each guest sends their own
+/// moves and shows the ones the host relays. You see the others' cards but
+/// not yours; tap your card to play or discard it, or a partner's card to
+/// hint its number or color.
 class CoopScreen extends StatefulWidget {
-  const CoopScreen({super.key, required this.players});
+  const CoopScreen({super.key, required this.players, this.host, this.guest})
+    : assert(host == null || guest == null);
 
+  /// Offline only; online, the room decides.
   final int players;
+  final HostSession? host;
+  final GuestSession? guest;
 
   @override
   State<CoopScreen> createState() => _CoopScreenState();
@@ -34,14 +40,55 @@ class CoopScreen extends StatefulWidget {
 typedef _Pick = ({int player, int index});
 
 class _CoopScreenState extends State<CoopScreen> {
-  late CoopGame _game = _deal();
+  late CoopGame _game;
+
+  /// Your seat, everyone's name and the seats bots play.
+  int _me = 0;
+  List<String> _names = const [];
+  Set<int> _bots = {};
+
+  /// Moves made in this game: the number the next one gets online.
+  int _moves = 0;
+
+  /// A guest's move is on its way to the host, who sends it back to
+  /// everyone; until then you cannot move again.
+  bool _sent = false;
+
+  /// The host closed the room.
+  bool _hostGone = false;
+
+  /// The host went back to the room: leave without closing the link.
+  bool _backToRoom = false;
+
+  final List<StreamSubscription<Object?>> _subscriptions = [];
 
   /// A fresh game; in dev mode the deck order opens its record in [MoveLog].
   CoopGame _deal() {
+    _moves = 0;
+    _sent = false;
+    final guest = widget.guest;
+    if (guest != null) {
+      final start = guest.game!;
+      _me = guest.seat ?? 0;
+      _names = start.table.names;
+      _bots = {...start.table.bots};
+      return CoopGame(players: start.table.players, deck: List.of(start.deck));
+    }
     final deck = buildDeck();
+    final host = widget.host;
+    if (host != null) {
+      final seating = host.start(deck);
+      _me = 0;
+      _names = seating.names;
+      _bots = {...seating.bots};
+      return CoopGame(players: seating.players, deck: List.of(deck));
+    }
     if (Settings.devMode.value) {
       MoveLog.startGame(deck, mode: 'coop${widget.players}');
     }
+    _me = 0;
+    _names = [tr.you, for (var s = 1; s < widget.players; s++) botName(s)];
+    _bots = {for (var s = 1; s < widget.players; s++) s};
     return CoopGame(players: widget.players, deck: List.of(deck));
   }
 
@@ -72,6 +119,34 @@ class _CoopScreenState extends State<CoopScreen> {
   void initState() {
     super.initState();
     _loading.then((_) {}, onError: (_) {});
+    _game = _deal();
+    final host = widget.host;
+    final guest = widget.guest;
+    if (host != null) {
+      _subscriptions
+        ..add(host.moves.listen(_onGuestMove))
+        ..add(host.left.listen(_onGuestLeft));
+    }
+    if (guest != null) {
+      // Moves the host sent before this screen was up.
+      for (final m in guest.moves) {
+        _applyMove(m);
+      }
+      _subscriptions.add(guest.messages.listen(_onHostMessage));
+      guest.closed.then((_) => _onHostGone());
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subscriptions) {
+      s.cancel();
+    }
+    // The host's guests go back to the room; a guest who leaves the game
+    // leaves the room, and a bot takes their seat.
+    widget.host?.sendLobby();
+    if (!_backToRoom) widget.guest?.close();
+    super.dispose();
   }
 
   /// Pause before each bot moves, so you can follow what happens.
@@ -89,16 +164,17 @@ class _CoopScreenState extends State<CoopScreen> {
   bool _misfire = false;
 
   /// Each player's last move, shown next to their name.
-  late List<String?> _lastMove = List.filled(widget.players, null);
+  late List<String?> _lastMove = List.filled(_game.players, null);
 
   /// Changes on every new game, so bot turns of an old game stop.
   int _round = 0;
 
-  bool get _myTurn => _game.current == 0 && !_game.isOver;
+  bool get _myTurn =>
+      _game.current == _me && !_game.isOver && !_sent && !_hostGone;
 
-  String? _name(int player) => player == 0 ? null : botNames[player - 1];
+  String? _name(int player) => player == _me ? null : _names[player];
 
-  String _label(int player) => player == 0 ? tr.you : botNames[player - 1];
+  String _label(int player) => player == _me ? tr.you : _names[player];
 
   void _restart() => setState(() {
     _round++;
@@ -107,13 +183,22 @@ class _CoopScreenState extends State<CoopScreen> {
     _news.clear();
     _revealed.clear();
     _misfire = false;
-    _lastMove = List.filled(widget.players, null);
+    _lastMove = List.filled(_game.players, null);
   });
 
   /// Applies [move] for the current player and reports it.
-  void _apply(CoopMove move) {
+  void _applyMove(CoopMove move) {
     final who = _game.current;
-    if (Settings.devMode.value) MoveLog.recordCoop(move);
+    if (who == _me) {
+      _news.clear();
+      _revealed.clear();
+      _misfire = false;
+      _selected = null;
+      _sent = false;
+    }
+    if (Settings.devMode.value && widget.host == null && widget.guest == null) {
+      MoveLog.recordCoop(move);
+    }
     final String text;
     switch (move) {
       case CoopPlay(:final index, :final target):
@@ -129,35 +214,121 @@ class _CoopScreenState extends State<CoopScreen> {
     }
     _news.add(text);
     _lastMove[who] = text;
+    _moves++;
+  }
+
+  /// Offline or as the host: makes [move] and tells the guests.
+  void _commit(CoopMove move) {
+    final n = _moves;
+    _applyMove(move);
+    widget.host?.sendMove(n, move);
   }
 
   Future<void> _myMove(CoopMove move) async {
-    setState(() {
-      _news.clear();
-      _revealed.clear();
-      _misfire = false;
-      _selected = null;
-      _apply(move);
-    });
-    await _runBots();
+    final guest = widget.guest;
+    if (guest != null) {
+      if (!_myTurn) return;
+      setState(() {
+        _sent = true;
+        _selected = null;
+      });
+      guest.sendMove(_moves, move);
+      return;
+    }
+    setState(() => _commit(move));
+    await _runOthers();
   }
 
-  Future<void> _runBots() async {
+  bool _running = false;
+
+  /// Offline or as the host: plays the bots' turns until a person's turn.
+  Future<void> _runOthers() async {
+    if (widget.guest != null || _running) return;
+    _running = true;
     final round = _round;
-    while (!_game.isOver && _game.current != 0) {
-      setState(() {});
-      await Future<void>.delayed(_botDelay);
-      if (!mounted || round != _round) return;
-      // About 0.1 s on a laptop browser.
-      final move = _decide(_game);
-      setState(() => _apply(move));
+    try {
+      while (!_game.isOver && _bots.contains(_game.current)) {
+        setState(() {});
+        await Future<void>.delayed(_botDelay);
+        if (!mounted || round != _round) return;
+        // About 0.1 s on a laptop browser.
+        final move = _decide(_game);
+        setState(() => _commit(move));
+      }
+    } finally {
+      _running = false;
     }
     if (_game.isOver) await _showEnd();
   }
 
+  /// The host: a guest's move, made if it is their turn and legal.
+  void _onGuestMove(GuestMove m) {
+    if (m.seat != _game.current || m.n != _moves || _bots.contains(m.seat)) {
+      return;
+    }
+    if (!_game.isLegal(m.move)) return;
+    setState(() => _commit(m.move));
+    _runOthers();
+  }
+
+  /// The host: a guest left, a bot takes their seat.
+  void _onGuestLeft(int seat) {
+    if (seat >= _game.players) return;
+    setState(() {
+      _bots.add(seat);
+      _news.add(tr.guestLeft(_names[seat]));
+    });
+    _runOthers();
+  }
+
+  bool _endShowing = false;
+
+  /// A guest: what the host says.
+  void _onHostMessage(HostMessage message) {
+    switch (message) {
+      case MoveMade(:final n, :final move):
+        if (n != _moves || !_game.isLegal(move)) return;
+        setState(() => _applyMove(move));
+        if (_game.isOver) _showEnd();
+      case StartGame():
+        if (_endShowing) Navigator.pop(context);
+        _restart();
+      case BotTakesOver(:final seat):
+        setState(() {
+          _bots.add(seat);
+          if (seat < _names.length) _news.add(tr.guestLeft(_names[seat]));
+        });
+      case LobbyUpdate():
+        _backToRoom = true;
+        if (_endShowing) Navigator.pop(context);
+        Navigator.pop(context);
+      case Welcome():
+    }
+  }
+
+  Future<void> _onHostGone() async {
+    if (!mounted || _backToRoom) return;
+    setState(() => _hostGone = true);
+    if (_endShowing) Navigator.pop(context);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: surface,
+        content: Text(tr.hostLeft),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(tr.ok),
+          ),
+        ],
+      ),
+    );
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
   Future<void> _play() async {
     final pick = _selected;
-    if (pick == null || pick.player != 0) return;
+    if (pick == null || pick.player != _me) return;
     CardColor? target;
     if (_game.needsTarget(pick.index)) {
       target = await _askTarget();
@@ -168,13 +339,13 @@ class _CoopScreenState extends State<CoopScreen> {
 
   Future<void> _discard() async {
     final pick = _selected;
-    if (pick == null || pick.player != 0) return;
+    if (pick == null || pick.player != _me) return;
     await _myMove(CoopDiscard(pick.index));
   }
 
   Future<void> _hint(Hint hint) async {
     final pick = _selected;
-    if (pick == null || pick.player == 0) return;
+    if (pick == null || pick.player == _me) return;
     await _myMove(CoopHint(pick.player, hint));
   }
 
@@ -216,7 +387,9 @@ class _CoopScreenState extends State<CoopScreen> {
   }
 
   Future<void> _showEnd() async {
-    if (!mounted) return;
+    if (!mounted || _endShowing) return;
+    final guest = widget.guest != null;
+    _endShowing = true;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -224,7 +397,9 @@ class _CoopScreenState extends State<CoopScreen> {
         backgroundColor: surface,
         title: Text(_game.fireworks.victory ? tr.perfectShow : tr.showOver),
         content: Text(
-          tr.teamScore(_game.score),
+          guest
+              ? '${tr.teamScore(_game.score)}\n\n${tr.hostDealsAgain}'
+              : tr.teamScore(_game.score),
           style: const TextStyle(fontSize: 18),
         ),
         actions: [
@@ -238,13 +413,14 @@ class _CoopScreenState extends State<CoopScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
-              _restart();
+              if (!guest) _restart();
             },
-            child: Text(tr.playAgain),
+            child: Text(guest ? tr.stay : tr.playAgain),
           ),
         ],
       ),
     );
+    _endShowing = false;
   }
 
   @override
@@ -259,7 +435,8 @@ class _CoopScreenState extends State<CoopScreen> {
               style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.w800),
             ),
             Text(
-              '${tr.coop} · ${widget.players} ${tr.playersHeader.toLowerCase()}',
+              '${widget.host != null || widget.guest != null ? tr.online : tr.coop}'
+              ' · ${_game.players} ${tr.playersHeader.toLowerCase()}',
               style: const TextStyle(fontSize: 12, color: textMuted),
             ),
           ],
@@ -282,11 +459,12 @@ class _CoopScreenState extends State<CoopScreen> {
                 });
               },
             ),
-          IconButton(
-            tooltip: tr.newGame,
-            icon: const Icon(Icons.refresh),
-            onPressed: _restart,
-          ),
+          if (widget.guest == null)
+            IconButton(
+              tooltip: tr.newGame,
+              icon: const Icon(Icons.refresh),
+              onPressed: _restart,
+            ),
         ],
       ),
       // Always in reach, however tall the table gets with four players.
@@ -327,7 +505,7 @@ class _CoopScreenState extends State<CoopScreen> {
 
   Widget _body(double cardWidth, double partnerWidth) {
     final possible = Settings.devMode.value
-        ? possibleCards(_game.viewFor(0))
+        ? possibleCards(_game.viewFor(_me))
         : null;
     // The table scrolls when it does not fit; your hand, what just
     // happened and the buttons stay put below it.
@@ -354,7 +532,9 @@ class _CoopScreenState extends State<CoopScreen> {
           ],
         ),
         const SizedBox(height: 14),
-        for (var p = 1; p < _game.players; p++) _partner(p, partnerWidth),
+        // Partners in turn order, starting with the one after you.
+        for (var k = 1; k < _game.players; k++)
+          _partner((_me + k) % _game.players, partnerWidth),
         const SizedBox(height: 6),
         _sectionLabel(tr.discards),
         SizedBox(
@@ -370,21 +550,21 @@ class _CoopScreenState extends State<CoopScreen> {
         const SizedBox(height: 8),
         _messageBar(),
         const SizedBox(height: 10),
-        _turnLabel(0, tr.yourHand),
+        _turnLabel(tr.yourHand),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < 5; i++)
-              i < _game.hands[0].length
+              i < _game.hands[_me].length
                   ? CardView(
-                      card: _game.hands[0][i],
+                      card: _game.hands[_me][i],
                       width: cardWidth,
-                      selected: _selected == (player: 0, index: i),
-                      highlighted: _revealed.contains(_game.hands[0][i]),
+                      selected: _selected == (player: _me, index: i),
+                      highlighted: _revealed.contains(_game.hands[_me][i]),
                       possible: possible?[i],
-                      onTap: () => _select(0, i),
+                      onTap: () => _select(_me, i),
                     )
                   : SizedBox(width: cardWidth),
           ],
@@ -457,7 +637,7 @@ class _CoopScreenState extends State<CoopScreen> {
     );
   }
 
-  Widget _turnLabel(int player, String text) => Row(
+  Widget _turnLabel(String text) => Row(
     children: [
       Text(
         text,
@@ -535,7 +715,7 @@ class _CoopScreenState extends State<CoopScreen> {
 
   Widget _actions() {
     final pick = _selected;
-    if (pick != null && pick.player != 0) {
+    if (pick != null && pick.player != _me) {
       final card = _game.hands[pick.player][pick.index];
       final canHint = _myTurn && _game.hints > 0;
       return Row(

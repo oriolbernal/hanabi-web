@@ -19,6 +19,11 @@ class Settings {
   /// Language of every text in the app; the device's until one is chosen.
   static final language = ValueNotifier(Language.system);
 
+  static const _nameKey = 'playerName';
+
+  /// The name other players see in online games.
+  static final playerName = ValueNotifier('');
+
   static Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -28,6 +33,7 @@ class Settings {
         orElse: () => Language.system,
       );
       devMode.value = prefs.getBool(_devModeKey) ?? false;
+      playerName.value = prefs.getString(_nameKey) ?? '';
       stats.value = Stats([
         for (final s in prefs.getStringList(_scoresKey) ?? []) int.parse(s),
       ]);
@@ -61,6 +67,14 @@ class Settings {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_languageKey, l.name);
+    } catch (_) {}
+  }
+
+  static Future<void> setPlayerName(String name) async {
+    playerName.value = name;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_nameKey, name);
     } catch (_) {}
   }
 

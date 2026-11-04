@@ -97,13 +97,7 @@ class MoveLog {
     await _save();
   }
 
-  static String describeCoop(CoopMove move) => switch (move) {
-    CoopPlay(:final index, :final target) => 'p$index${target?.symbol ?? ''}',
-    CoopDiscard(:final index) => 'd$index',
-    CoopHint(:final to, hint: NumberHint(:final number)) => 'h$to:$number',
-    CoopHint(:final to, hint: ColorHint(:final color)) =>
-      'h$to:${color.symbol}',
-  };
+  static String describeCoop(CoopMove move) => move.text;
 
   /// The log as JSON lines, one game each, oldest first.
   static Future<String> export() async {

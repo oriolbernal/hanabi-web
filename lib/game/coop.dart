@@ -8,7 +8,65 @@ import 'game.dart';
 const maxPlayers = 4;
 
 /// What a player does on their turn in a cooperative game.
-sealed class CoopMove {}
+///
+/// As text (move log, online games): `p3` plays card 3 (a joker above 1
+/// adds its pile, `p3B`), `d0` discards card 0, `h2:5` / `h1:R` tells
+/// player 2 about the 5s / player 1 about the reds.
+sealed class CoopMove {
+  CoopMove();
+
+  /// Reads a move written by [text]; throws [FormatException] on anything
+  /// else.
+  factory CoopMove.parse(String text) {
+    CardColor color(String symbol) => CardColor.values.firstWhere(
+      (c) => c.symbol == symbol,
+      orElse: () => throw FormatException('no color $symbol'),
+    );
+    final match = RegExp(
+      r'^(?:p(\d)([RGBYW])?|d(\d)|h(\d):(?:([1-5])|([RGBYW*])))$',
+    ).firstMatch(text);
+    if (match == null) throw FormatException('not a move: $text');
+    if (match[1] != null) {
+      return CoopPlay(
+        int.parse(match[1]!),
+        target: match[2] == null ? null : color(match[2]!),
+      );
+    }
+    if (match[3] != null) return CoopDiscard(int.parse(match[3]!));
+    final to = int.parse(match[4]!);
+    return CoopHint(
+      to,
+      match[5] != null
+          ? NumberHint(int.parse(match[5]!))
+          : ColorHint(color(match[6]!)),
+    );
+  }
+
+  String get text => switch (this) {
+    CoopPlay(:final index, :final target) => 'p$index${target?.symbol ?? ''}',
+    CoopDiscard(:final index) => 'd$index',
+    CoopHint(:final to, hint: NumberHint(:final number)) => 'h$to:$number',
+    CoopHint(:final to, hint: ColorHint(:final color)) =>
+      'h$to:${color.symbol}',
+  };
+}
+
+/// A deck as text, two characters a card (`1R`, `3*`), and back.
+String deckText(List<GameCard> deck) => deck.map((c) => '$c').join();
+
+List<GameCard> parseDeck(String text) {
+  if (text.length.isOdd) throw const FormatException('odd deck text');
+  return [
+    for (var i = 0; i < text.length; i += 2)
+      GameCard(
+        int.parse(text[i]),
+        CardColor.values.firstWhere(
+          (c) => c.symbol == text[i + 1],
+          orElse: () => throw FormatException('no color ${text[i + 1]}'),
+        ),
+      ),
+  ];
+}
 
 class CoopPlay extends CoopMove {
   CoopPlay(this.index, {this.target});
@@ -223,6 +281,31 @@ class CoopGame {
     }
     _endTurn();
     return touched;
+  }
+
+  /// Whether the current player may make [move]: a card they hold, a pile
+  /// for a joker above 1 (and none otherwise), a hint token and a hint that
+  /// touches a card of another player.
+  bool isLegal(CoopMove move) {
+    if (isOver) return false;
+    final hand = hands[current];
+    switch (move) {
+      case CoopPlay(:final index, :final target):
+        if (index < 0 || index >= hand.length) return false;
+        return needsTarget(index) == (target != null);
+      case CoopDiscard(:final index):
+        return index >= 0 && index < hand.length;
+      case CoopHint(:final to, :final hint):
+        if (to == current || to < 0 || to >= players || hints == 0) {
+          return false;
+        }
+        return hands[to].any(
+          (c) => switch (hint) {
+            NumberHint(:final number) => c.number == number,
+            ColorHint(:final color) => c.color == color,
+          },
+        );
+    }
   }
 
   /// Applies any [move] for the current player.

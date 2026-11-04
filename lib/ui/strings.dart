@@ -104,6 +104,41 @@ abstract class Strings {
   String hintedBy(String? giver, String? receiver, Hint hint);
   String teamScore(int score);
 
+  // Online games, on several phones.
+  String get offline;
+  String get online;
+  String get onlineDescription;
+  String get yourName;
+  String get createRoom;
+  String get joinRoom;
+  String get room;
+  String get seatBot;
+  String get seatFriend;
+  String get invite;
+  String get waitingAnswer;
+  String get inviteHelp;
+  String get scanAnswer;
+  String get scanCode;
+  String get pasteCode;
+  String get copyCode;
+  String get codeCopied;
+  String get startGame;
+  String get startHelp;
+  String get joinHelp;
+  String get answerHelp;
+  String get connecting;
+  String get waitingHost;
+  String get hostLeft;
+  String guestLeft(String name);
+  String get notACode;
+  String get connectionFailed;
+  String get pointCamera;
+  String get cancel;
+  String get ok;
+  String get keepAwake;
+  String get hostDealsAgain;
+  String get stay;
+
   // Advisor.
   String advicePlay(int card, String chance);
   String adviceDiscard(int card, String points);
@@ -283,6 +318,78 @@ class _English extends Strings {
 
   @override
   String teamScore(int score) => 'The team scored $score / 25';
+
+  @override
+  String get offline => 'Offline';
+  @override
+  String get online => 'Online';
+  @override
+  String get onlineDescription =>
+      'Play with friends, each on their own phone. You connect by scanning '
+      'QR codes, with no server in between.';
+  @override
+  String get yourName => 'Your name';
+  @override
+  String get createRoom => 'Create a room';
+  @override
+  String get joinRoom => 'Join a room';
+  @override
+  String get room => 'Room';
+  @override
+  String get seatBot => 'Bot';
+  @override
+  String get seatFriend => 'Friend';
+  @override
+  String get invite => 'Invite';
+  @override
+  String get waitingAnswer => 'Waiting for their code';
+  @override
+  String get inviteHelp =>
+      'Your friend taps "Join a room" and scans this code. Then scan the '
+      'code their phone shows.';
+  @override
+  String get scanAnswer => "Scan your friend's code";
+  @override
+  String get scanCode => "Scan the host's code";
+  @override
+  String get pasteCode => 'Paste a code';
+  @override
+  String get copyCode => 'Copy code';
+  @override
+  String get codeCopied => 'Code copied: send it if you are not together';
+  @override
+  String get startGame => 'Start';
+  @override
+  String get startHelp => 'Bots play the seats with nobody connected.';
+  @override
+  String get joinHelp => "Scan the code on the host's phone.";
+  @override
+  String get answerHelp => 'Now the host scans this code.';
+  @override
+  String get connecting => 'Connecting…';
+  @override
+  String get waitingHost => 'Waiting for the host to start the game…';
+  @override
+  String get hostLeft => 'The host left the room.';
+  @override
+  String guestLeft(String name) => '$name left; a bot takes their seat.';
+  @override
+  String get notACode => 'That is not a Hanabi code.';
+  @override
+  String get connectionFailed => 'Could not connect. Try again.';
+  @override
+  String get pointCamera => 'Point the camera at the QR code';
+  @override
+  String get cancel => 'Cancel';
+  @override
+  String get ok => 'OK';
+  @override
+  String get keepAwake =>
+      'Keep the screen on: a locked phone may drop out of the game.';
+  @override
+  String get hostDealsAgain => 'The host can start another game.';
+  @override
+  String get stay => 'Stay';
 
   @override
   String advicePlay(int card, String chance) =>
@@ -529,6 +636,80 @@ class _Catalan extends Strings {
   String teamScore(int score) => "L'equip ha fet $score punts de 25";
 
   @override
+  String get offline => 'Fora de línia';
+  @override
+  String get online => 'En línia';
+  @override
+  String get onlineDescription =>
+      'Juga amb amics, cadascú amb el seu mòbil. Us connecteu escanejant '
+      'codis QR, sense cap servidor pel mig.';
+  @override
+  String get yourName => 'El teu nom';
+  @override
+  String get createRoom => 'Crear una sala';
+  @override
+  String get joinRoom => 'Unir-me a una sala';
+  @override
+  String get room => 'Sala';
+  @override
+  String get seatBot => 'Bot';
+  @override
+  String get seatFriend => 'Amic';
+  @override
+  String get invite => 'Convidar';
+  @override
+  String get waitingAnswer => 'Esperant el seu codi';
+  @override
+  String get inviteHelp =>
+      "El teu amic toca «Unir-me a una sala» i escaneja aquest codi. Després "
+      'escaneja el codi que li surti al mòbil.';
+  @override
+  String get scanAnswer => 'Escanejar el codi del teu amic';
+  @override
+  String get scanCode => "Escanejar el codi de l'amfitrió";
+  @override
+  String get pasteCode => 'Enganxar un codi';
+  @override
+  String get copyCode => 'Copiar el codi';
+  @override
+  String get codeCopied => "Codi copiat: envia'l si no sou junts";
+  @override
+  String get startGame => 'Començar';
+  @override
+  String get startHelp => 'Les cadires sense ningú connectat les juguen bots.';
+  @override
+  String get joinHelp => "Escaneja el codi del mòbil de l'amfitrió.";
+  @override
+  String get answerHelp => "Ara l'amfitrió escaneja aquest codi.";
+  @override
+  String get connecting => 'Connectant…';
+  @override
+  String get waitingHost => "Esperant que l'amfitrió comenci la partida…";
+  @override
+  String get hostLeft => "L'amfitrió ha tancat la sala.";
+  @override
+  String guestLeft(String name) =>
+      "$name ha marxat; ara juga un bot al seu lloc.";
+  @override
+  String get notACode => 'Aquest no és un codi de Hanabi.';
+  @override
+  String get connectionFailed => "No s'ha pogut connectar. Torna-ho a provar.";
+  @override
+  String get pointCamera => 'Apunta la càmera al codi QR';
+  @override
+  String get cancel => 'Cancel·lar';
+  @override
+  String get ok => "D'acord";
+  @override
+  String get keepAwake =>
+      'Mantén la pantalla encesa: si el mòbil es bloqueja, pots sortir de la '
+      'partida.';
+  @override
+  String get hostDealsAgain => "L'amfitrió pot començar una altra partida.";
+  @override
+  String get stay => 'Quedar-me';
+
+  @override
   String advicePlay(int card, String chance) =>
       'Juga la carta $card · $chance que encaixi';
   @override
@@ -773,6 +954,80 @@ class _Spanish extends Strings {
 
   @override
   String teamScore(int score) => 'El equipo ha hecho $score puntos de 25';
+
+  @override
+  String get offline => 'Sin conexión';
+  @override
+  String get online => 'En línea';
+  @override
+  String get onlineDescription =>
+      'Juega con amigos, cada uno con su móvil. Os conectáis escaneando '
+      'códigos QR, sin ningún servidor de por medio.';
+  @override
+  String get yourName => 'Tu nombre';
+  @override
+  String get createRoom => 'Crear una sala';
+  @override
+  String get joinRoom => 'Unirme a una sala';
+  @override
+  String get room => 'Sala';
+  @override
+  String get seatBot => 'Bot';
+  @override
+  String get seatFriend => 'Amigo';
+  @override
+  String get invite => 'Invitar';
+  @override
+  String get waitingAnswer => 'Esperando su código';
+  @override
+  String get inviteHelp =>
+      'Tu amigo toca «Unirme a una sala» y escanea este código. Después '
+      'escanea el código que le salga en el móvil.';
+  @override
+  String get scanAnswer => 'Escanear el código de tu amigo';
+  @override
+  String get scanCode => 'Escanear el código del anfitrión';
+  @override
+  String get pasteCode => 'Pegar un código';
+  @override
+  String get copyCode => 'Copiar el código';
+  @override
+  String get codeCopied => 'Código copiado: envíalo si no estáis juntos';
+  @override
+  String get startGame => 'Empezar';
+  @override
+  String get startHelp => 'Las sillas sin nadie conectado las juegan bots.';
+  @override
+  String get joinHelp => 'Escanea el código del móvil del anfitrión.';
+  @override
+  String get answerHelp => 'Ahora el anfitrión escanea este código.';
+  @override
+  String get connecting => 'Conectando…';
+  @override
+  String get waitingHost => 'Esperando a que el anfitrión empiece la partida…';
+  @override
+  String get hostLeft => 'El anfitrión ha cerrado la sala.';
+  @override
+  String guestLeft(String name) =>
+      '$name se ha ido; ahora juega un bot en su lugar.';
+  @override
+  String get notACode => 'Esto no es un código de Hanabi.';
+  @override
+  String get connectionFailed => 'No se ha podido conectar. Vuelve a probar.';
+  @override
+  String get pointCamera => 'Apunta la cámara al código QR';
+  @override
+  String get cancel => 'Cancelar';
+  @override
+  String get ok => 'Vale';
+  @override
+  String get keepAwake =>
+      'Mantén la pantalla encendida: si el móvil se bloquea, puedes salir de '
+      'la partida.';
+  @override
+  String get hostDealsAgain => 'El anfitrión puede empezar otra partida.';
+  @override
+  String get stay => 'Quedarme';
 
   @override
   String advicePlay(int card, String chance) =>

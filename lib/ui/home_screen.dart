@@ -5,6 +5,7 @@ import '../game/coop.dart';
 import 'coop_screen.dart';
 import 'game_screen.dart';
 import 'hint_mode.dart';
+import 'online_screen.dart';
 import 'palette.dart';
 import 'settings.dart';
 import 'strings.dart';
@@ -19,6 +20,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   HintMode _mode = HintMode.ai;
+
+  /// On this phone, or with friends on theirs.
+  bool _online = false;
 
   /// Solitaire, or a cooperative game with bots.
   bool _coop = false;
@@ -88,6 +92,90 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _connectionSelector() {
+    return SegmentedButton<bool>(
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: false,
+          icon: const Icon(Icons.phone_android),
+          label: Text(tr.offline),
+        ),
+        ButtonSegment(
+          value: true,
+          icon: const Icon(Icons.wifi_tethering),
+          label: Text(tr.online),
+        ),
+      ],
+      selected: {_online},
+      onSelectionChanged: (s) => setState(() => _online = s.first),
+    );
+  }
+
+  late final _name = TextEditingController(text: Settings.playerName.value);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  /// Your name, then a room to create or join.
+  Widget _onlineSection() {
+    final named = _name.text.trim().isNotEmpty;
+    return Column(
+      children: [
+        Text(
+          tr.onlineDescription,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: textMuted, fontSize: 13),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _name,
+          maxLength: 16,
+          textAlign: TextAlign.center,
+          decoration: InputDecoration(
+            labelText: tr.yourName,
+            border: const OutlineInputBorder(),
+            counterText: '',
+          ),
+          onChanged: (text) {
+            Settings.setPlayerName(text.trim());
+            setState(() {});
+          },
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: 240,
+          child: FilledButton.icon(
+            onPressed: named ? () => _push(const HostRoomScreen()) : null,
+            icon: const Icon(Icons.add),
+            label: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(tr.createRoom, style: const TextStyle(fontSize: 16)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: 240,
+          child: OutlinedButton.icon(
+            onPressed: named ? () => _push(const JoinRoomScreen()) : null,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(tr.joinRoom, style: const TextStyle(fontSize: 16)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _push(Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
   Widget _playersSelector() {
     return Column(
       children: [
@@ -151,7 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: SafeArea(
           child: Center(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -180,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    _coop ? tr.coopSubtitle : tr.subtitle,
+                    _online || _coop ? tr.coopSubtitle : tr.subtitle,
                     style: const TextStyle(
                       fontSize: 16,
                       color: textMuted,
@@ -189,27 +277,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 28),
                   SizedBox(width: 280, child: _languageSelector()),
+                  const SizedBox(height: 16),
+                  SizedBox(width: 280, child: _connectionSelector()),
                   const SizedBox(height: 24),
-                  SizedBox(width: 280, child: _gameSelector()),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: 280,
-                    child: _coop ? _playersSelector() : _modeSelector(),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: 240,
-                    child: FilledButton(
-                      onPressed: _play,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(
-                          tr.play,
-                          style: const TextStyle(fontSize: 18),
+                  if (_online)
+                    SizedBox(width: 280, child: _onlineSection())
+                  else ...[
+                    SizedBox(width: 280, child: _gameSelector()),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 280,
+                      child: _coop ? _playersSelector() : _modeSelector(),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 240,
+                      child: FilledButton(
+                        onPressed: _play,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            tr.play,
+                            style: const TextStyle(fontSize: 18),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   SizedBox(
                     width: 240,
