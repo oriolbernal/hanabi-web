@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../game/card.dart';
 import '../game/game.dart';
 import '../sim/expert.dart';
-import '../sim/hint_search.dart';
 import '../sim/simulated_player.dart';
 import 'advisor.dart';
 import 'card_view.dart';
@@ -142,30 +141,8 @@ class _GameScreenState extends State<GameScreen> {
     if (mounted) _toast(tr.logCopied(await MoveLog.length));
   }
 
-  /// While the search hint giver is thinking: no other move meanwhile.
-  bool _thinking = false;
-
   Future<void> _hint() async {
-    final Hint? picked;
-    if (widget.strategy case final SearchHints search) {
-      if (_game.usefulHints.isEmpty) {
-        _toast(tr.allKnown);
-        return;
-      }
-      setState(() => _thinking = true);
-      _toast(tr.thinking);
-      final chosen = await search.chooseWithin(
-        Game.copy(_game),
-        const Duration(milliseconds: 1500),
-      );
-      if (!mounted) return;
-      setState(() => _thinking = false);
-      if (chosen == null) return;
-      _game.giveHint(chosen);
-      picked = chosen;
-    } else {
-      picked = _game.hint();
-    }
+    final picked = _game.hint();
     if (picked == null) {
       _toast(tr.allKnown);
       return;
@@ -429,7 +406,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.play,
             icon: Icons.auto_awesome,
             color: cardColor(CardColor.green),
-            onPressed: hasSelection && !_thinking ? _play : null,
+            onPressed: hasSelection ? _play : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -438,7 +415,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.discard,
             icon: Icons.delete_outline,
             color: cardColor(CardColor.red),
-            onPressed: hasSelection && !_thinking ? _discard : null,
+            onPressed: hasSelection ? _discard : null,
           ),
         ),
         const SizedBox(width: 10),
@@ -447,7 +424,7 @@ class _GameScreenState extends State<GameScreen> {
             label: tr.hint,
             icon: Icons.lightbulb_outline,
             color: hintColor,
-            onPressed: _game.hints > 0 && !_thinking ? _hint : null,
+            onPressed: _game.hints > 0 ? _hint : null,
           ),
         ),
       ],

@@ -44,7 +44,6 @@ abstract class Strings {
   String get devModeDetail;
   String modeLabel(HintMode m);
   String modeDescription(HintMode m);
-  String get thinking;
 
   /// Dev mode: copies the log of the person's moves to the clipboard.
   String get copyLog;
@@ -123,8 +122,6 @@ class _English extends Strings {
   const _English();
 
   @override
-  String get thinking => 'Thinking of the best hint…';
-  @override
   String get copyLog => 'Copy move log';
   @override
   String logCopied(int moves) => 'Copied: $moves games';
@@ -147,18 +144,13 @@ class _English extends Strings {
   @override
   String modeLabel(HintMode m) => switch (m) {
     HintMode.classic => 'Classic',
-    HintMode.smart => 'Smart',
     HintMode.ai => 'AI',
-    HintMode.search => 'Search',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
     HintMode.classic => 'The original rule: reveals what most cards share.',
-    HintMode.smart => 'Tries every hint and picks the one that helps most.',
     HintMode.ai =>
       'A neural network that learned from the search over thousands of games.',
-    HintMode.search =>
-      'Plays out every hint many times and gives the best one.',
   };
 
   @override
@@ -360,8 +352,6 @@ class _Catalan extends Strings {
       x.toStringAsFixed(digits).replaceAll('.', ',');
 
   @override
-  String get thinking => 'Pensant la millor pista…';
-  @override
   String get copyLog => 'Copia el registre de jugades';
   @override
   String logCopied(int moves) => 'Copiat: $moves partides';
@@ -385,18 +375,14 @@ class _Catalan extends Strings {
   @override
   String modeLabel(HintMode m) => switch (m) {
     HintMode.classic => 'Clàssic',
-    HintMode.smart => 'Llest',
     HintMode.ai => 'IA',
-    HintMode.search => 'Cerca',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
     HintMode.classic =>
       'La regla original: revela el que tenen en comú més cartes.',
-    HintMode.smart => 'Prova totes les pistes i tria la que més ajuda.',
     HintMode.ai =>
       'Una xarxa neuronal que ha après de la cerca en milers de partides.',
-    HintMode.search => 'Juga cada pista moltes vegades i et dona la millor.',
   };
 
   @override
@@ -614,8 +600,6 @@ class _Spanish extends Strings {
       x.toStringAsFixed(digits).replaceAll('.', ',');
 
   @override
-  String get thinking => 'Pensando la mejor pista…';
-  @override
   String get copyLog => 'Copiar el registro de jugadas';
   @override
   String logCopied(int moves) => 'Copiado: $moves partidas';
@@ -639,18 +623,14 @@ class _Spanish extends Strings {
   @override
   String modeLabel(HintMode m) => switch (m) {
     HintMode.classic => 'Clásico',
-    HintMode.smart => 'Listo',
     HintMode.ai => 'IA',
-    HintMode.search => 'Busca',
   };
   @override
   String modeDescription(HintMode m) => switch (m) {
     HintMode.classic =>
       'La regla original: revela lo que comparten más cartas.',
-    HintMode.smart => 'Prueba todas las pistas y elige la que más ayuda.',
     HintMode.ai =>
       'Una red neuronal que ha aprendido de la búsqueda en miles de partidas.',
-    HintMode.search => 'Juega cada pista muchas veces y te da la mejor.',
   };
 
   @override
