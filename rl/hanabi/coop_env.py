@@ -17,6 +17,17 @@ Observation (OBS_SIZE numbers), raw facts only:
 - the last hint each player received since their own turn (cards touched
   and its focus), and the last move of each other player.
 
+Rewards (Rewards): points added to the fireworks, plus the shaping below,
+whose weights are set per run:
+- a play that misfires: -misfire;
+- a discard of a card that can never be played again: +useless;
+- a discard that lowers the best score still reachable (the last copy of a
+  card a pile needs): -lost_point for each point lost;
+- a discard of a card still needed but with copies left: -needed / copies
+  left (the fewer remain, the more it costs);
+- reaching 25: +perfect.
+The evaluation always reports the plain score.
+
 Actions (N_ACTIONS): play slot i (5), play joker in slot i on pile c (25),
 discard slot i (5), hint the player k seats ahead about a number (3 x 5)
 or a color (3 x 6).
@@ -25,11 +36,12 @@ or a color (3 x 6).
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 
 import numpy as np
 
 from .coop import MAX_PLAYERS, CoopGame
-from .game import ALLOWED_ERRORS, COLORS, HAND_SIZE, MAX_HINTS, PILES, Card, build_deck, copies
+from .game import ALLOWED_ERRORS, COLORS, HAND_SIZE, MAX_HINTS, PILES, Card, Game, build_deck, copies
 
 N_ID = 5 * COLORS  # card identities: (number - 1) * 6 + color
 
@@ -45,6 +57,12 @@ def _possible(card: Card) -> tuple[list[int], list[int]]:
     numbers = [card.number] if card.known_number else [n for n in range(1, 6) if n not in card.not_numbers]
     colors = [card.color] if card.known_color else [c for c in range(COLORS) if c not in card.not_colors]
     return numbers, colors
+
+
+def _dead(g: CoopGame, card: Card) -> bool:
+    """Whether [card] can never be played: its pile (every pile, for a joker) is past it."""
+    piles = PILES if card.is_joker else (card.color,)
+    return all(g.fireworks.top_number(p) >= card.number for p in piles)
 
 
 # Layout.
@@ -67,9 +85,24 @@ OBS_SIZE = _OFF_LAST + (MAX_PLAYERS - 1) * _LAST
 _TOTAL = np.array([copies(n, c) for n in range(1, 6) for c in range(COLORS)], dtype=np.float32)
 
 
+@dataclass
+class Rewards:
+    misfire: float = 1.0
+    useless: float = 0.1
+    lost_point: float = 1.0
+    needed: float = 0.2
+    perfect: float = 5.0
+
+
+def max_score(game: CoopGame) -> int:
+    """Best score still reachable (the solitaire's rule fits: discards and piles)."""
+    return Game.max_score(game)  # type: ignore[arg-type]
+
+
 class CoopEnv:
-    def __init__(self, players: int, seed: int | None = None) -> None:
+    def __init__(self, players: int, seed: int | None = None, rewards: Rewards | None = None) -> None:
         self.players = players
+        self.rewards = rewards or Rewards()
         self.rng = random.Random(seed)
         self.reset()
 
@@ -115,22 +148,43 @@ class CoopEnv:
         return ("h", (g.current + k + 1) % g.players, ("c", c))
 
     def step(self, action: int) -> tuple[float, bool]:
-        """Plays [action] for the current player; returns (points, over)."""
+        """Plays [action] for the current player; returns (reward, over)."""
         g = self.game
+        w = self.rewards
         move = self.decode(action)
         me = g.current
         before = g.score
+        reward = 0.0
         if move[0] == "p":
             card = g.hands[me][move[1]]
+            lives = g.errors
             fits = g.play(move[1], move[2])
+            if g.errors < lives:
+                reward -= w.misfire
             self.last[me] = ("p", move[1], None, ident(card), fits)
         elif move[0] == "d":
-            card = g.discard(move[1])
+            card = g.hands[me][move[1]]
+            reachable = max_score(g)
+            dead = _dead(g, card)
+            g.discard(move[1])
+            lost = reachable - max_score(g)
+            if lost > 0:
+                reward -= w.lost_point * lost
+            elif dead:
+                reward += w.useless
+            else:
+                left = copies(card.number, card.color) - sum(
+                    1 for c in g.discarded if c.number == card.number and c.color == card.color
+                )
+                reward -= w.needed / max(left, 1)
             self.last[me] = ("d", move[1], None, ident(card), True)
         else:
             g.hint(move[1], move[2])
             self.last[me] = ("h", None, move[1], move[2], True)
-        return float(g.score - before), g.is_over
+        reward += g.score - before
+        if g.is_over and g.score == 25:
+            reward += w.perfect
+        return reward, g.is_over
 
     # --- observation -------------------------------------------------------
 

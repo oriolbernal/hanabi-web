@@ -2,8 +2,10 @@
 
 Workers play many games at once with a copy of the network and send back
 what happened; the learner updates the network with PPO and sends the new
-weights. The only signal is the team's score (points added per move): no
-hand-made rule says what is a good hint or when a 5 may go.
+weights. The signal is the team's score plus the shaping rewards of
+hanabi/coop_env.Rewards (misfires, discards that lose points or waste a card
+still needed, a bonus for 25), each weight set with --r-<name>. No rule says
+which move to make: only how good or bad each outcome is.
 
     uv run python coop_ppo.py --out runs/sp1 --workers 8 --hours 2
 
@@ -24,7 +26,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from hanabi.coop_env import N_ACTIONS, OBS_SIZE, CoopEnv
+from hanabi.coop_env import N_ACTIONS, OBS_SIZE, CoopEnv, Rewards
 
 
 class Net(nn.Module):
@@ -44,11 +46,11 @@ class Net(nn.Module):
         return logits, self.v(h)[..., 0]
 
 
-def worker(conn, seed: int, envs: int, steps: int, hidden: int) -> None:
+def worker(conn, seed: int, envs: int, steps: int, hidden: int, rewards: Rewards) -> None:
     torch.set_num_threads(1)
     rng = np.random.default_rng(seed)
     net = Net(hidden)
-    games = [CoopEnv(int(rng.integers(2, 5)), seed=seed * 1000 + i) for i in range(envs)]
+    games = [CoopEnv(int(rng.integers(2, 5)), seed=seed * 1000 + i, rewards=rewards) for i in range(envs)]
     finished: list[tuple[int, int]] = []
     while True:
         msg = conn.recv()
@@ -159,11 +161,15 @@ def main() -> None:
     p.add_argument("--hours", type=float, default=1.0)
     p.add_argument("--eval-every", type=int, default=25)
     p.add_argument("--resume")
+    for name, value in vars(Rewards()).items():
+        p.add_argument(f"--r-{name.replace('_', '-')}", type=float, default=value)
     p.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     args = p.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     torch.manual_seed(0)
+    rewards = Rewards(**{k: getattr(args, f"r_{k}") for k in vars(Rewards())})
+    (out / "config.json").write_text(json.dumps(vars(args), indent=1))
 
     net = Net(args.hidden)
     if args.resume:
@@ -176,7 +182,7 @@ def main() -> None:
     procs = []
     for w in range(args.workers):
         a, b = ctx.Pipe()
-        proc = ctx.Process(target=worker, args=(b, w + 1, args.envs, args.steps, args.hidden), daemon=True)
+        proc = ctx.Process(target=worker, args=(b, w + 1, args.envs, args.steps, args.hidden, rewards), daemon=True)
         proc.start()
         pipes.append(a)
         procs.append(proc)
