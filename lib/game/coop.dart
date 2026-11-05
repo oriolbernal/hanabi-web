@@ -68,6 +68,25 @@ class ReceivedHint {
       touched.contains(chop) ? chop : touched.reduce((a, b) => a > b ? a : b);
 }
 
+/// What a player did on their last turn, as the others remember it: the
+/// slot they played or discarded (and whether a play fitted), or the hint
+/// they gave and to whom.
+class LastMove {
+  LastMove.play(this.slot, {required this.fits})
+    : kind = 'p',
+      to = -1,
+      hint = null;
+  LastMove.discard(this.slot) : kind = 'd', to = -1, hint = null, fits = true;
+  LastMove.hint(this.to, Hint this.hint) : kind = 'h', slot = -1, fits = true;
+
+  /// 'p', 'd' or 'h'.
+  final String kind;
+  final int slot;
+  final int to;
+  final Hint? hint;
+  final bool fits;
+}
+
 /// A deck as text, two characters a card (`1R`, `3*`), and back.
 String deckText(List<GameCard> deck) => deck.map((c) => '$c').join();
 
@@ -120,6 +139,7 @@ class CoopGame {
       fireworks = Fireworks() {
     for (var p = 0; p < players; p++) {
       received.add(null);
+      lastMoves.add(null);
       hands.add([]);
       for (var i = 0; i < handSize; i++) {
         _draw(p);
@@ -136,6 +156,7 @@ class CoopGame {
       errors = other.errors,
       current = other.current {
     received.addAll(other.received);
+    lastMoves.addAll(other.lastMoves);
     for (final hand in other.hands) {
       hands.add([for (final c in hand) c.copy()]);
     }
@@ -205,6 +226,9 @@ class CoopGame {
 
   /// Per player, the last hint received since their own last turn.
   final List<ReceivedHint?> received = [];
+
+  /// Per player, their last move.
+  final List<LastMove?> lastMoves = [];
   int hints = maxHints;
   int errors = allowedErrors;
 
@@ -267,6 +291,7 @@ class CoopGame {
       errors--;
       result = PlayFailure(card);
     }
+    lastMoves[current] = LastMove.play(index, fits: result is PlaySuccess);
     _endTurn();
     return result;
   }
@@ -277,6 +302,7 @@ class CoopGame {
     discarded.add(card);
     _draw(current);
     if (hints < maxHints) hints++;
+    lastMoves[current] = LastMove.discard(index);
     _endTurn();
     return card;
   }
@@ -306,6 +332,7 @@ class CoopGame {
       for (var i = 0; i < hands[to].length; i++)
         if (touched.contains(hands[to][i])) i,
     ], chop);
+    lastMoves[current] = LastMove.hint(to, hint);
     _endTurn();
     return touched;
   }

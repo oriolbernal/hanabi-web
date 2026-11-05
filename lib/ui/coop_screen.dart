@@ -9,6 +9,7 @@ import '../game/coop.dart';
 import '../game/game.dart';
 import '../sim/coop_net.dart';
 import '../sim/coop_search.dart';
+import '../sim/selfplay_bot.dart';
 import '../net/online.dart';
 import 'card_view.dart';
 import 'game_screen.dart';
@@ -24,11 +25,24 @@ import 'strings.dart';
 /// not yours; tap your card to play or discard it, or a partner's card to
 /// hint its number or color.
 class CoopScreen extends StatefulWidget {
-  const CoopScreen({super.key, required this.players, this.host, this.guest})
-    : assert(host == null || guest == null);
+  const CoopScreen({
+    super.key,
+    required this.players,
+    this.host,
+    this.guest,
+    this.selfPlay = false,
+    this.watch = false,
+  }) : assert(host == null || guest == null);
 
   /// Offline only; online, the room decides.
   final int players;
+
+  /// Bots trained by self-play alone (rl/coop_ppo.py) instead of the ones
+  /// trained to play next to a person.
+  final bool selfPlay;
+
+  /// Offline: every seat is a bot and you watch, every hand face up.
+  final bool watch;
   final HostSession? host;
   final GuestSession? guest;
 
@@ -83,12 +97,15 @@ class _CoopScreenState extends State<CoopScreen> {
       _bots = {...seating.bots};
       return CoopGame(players: seating.players, deck: List.of(deck));
     }
-    if (Settings.devMode.value) {
+    if (Settings.devMode.value && !widget.watch) {
       MoveLog.startGame(deck, mode: 'coop${widget.players}');
     }
     _me = 0;
-    _names = [tr.you, for (var s = 1; s < widget.players; s++) botName(s)];
-    _bots = {for (var s = 1; s < widget.players; s++) s};
+    _names = [
+      widget.watch ? _watchedName : tr.you,
+      for (var s = 1; s < widget.players; s++) botName(s),
+    ];
+    _bots = {for (var s = widget.watch ? 0 : 1; s < widget.players; s++) s};
     return CoopGame(players: widget.players, deck: List.of(deck));
   }
 
@@ -100,7 +117,25 @@ class _CoopScreenState extends State<CoopScreen> {
   /// 2 players 22.0 (rules 21.1), 3 players 24.1 (22.5), 4 players 24.4
   /// (22.7), about 0.3 bot misfires a game. Until it has loaded, the search
   /// plays.
-  CoopMove _decide(CoopGame g) => _net?.decide(g) ?? _fallback.decide(g);
+  CoopMove _decide(CoopGame g) {
+    if (widget.selfPlay && _selfPlay != null) return _selfPlay!.decide(g);
+    return _net?.decide(g) ?? _fallback.decide(g);
+  }
+
+  /// The self-play bot (assets/models/coop_selfplay.json, exported by
+  /// rl/export_selfplay.py): with copies of itself it reaches 25 in about
+  /// 70% of 2-player games and 80-90% with 3 or 4 (bin/coop_eval.dart
+  /// --bots, 300 games); next to a person it is untested.
+  static SelfPlayBot? _selfPlay;
+  static final Future<void> _loadingSelfPlay = rootBundle
+      .loadString('assets/models/coop_selfplay.json')
+      .then(
+        (json) =>
+            _selfPlay = SelfPlayBot(jsonDecode(json) as Map<String, dynamic>),
+      );
+
+  /// The bot in your seat when you only watch.
+  static const _watchedName = 'Yui';
 
   static CoopNet? _net;
   static final _fallback = CoopSearch(rounds: 128, minPlayChance: 0.8);
@@ -120,6 +155,11 @@ class _CoopScreenState extends State<CoopScreen> {
     super.initState();
     _loading.then((_) {}, onError: (_) {});
     _game = _deal();
+    if (widget.selfPlay) {
+      _loadingSelfPlay.then((_) => _startWatching(), onError: (_) {});
+    } else {
+      _startWatching();
+    }
     final host = widget.host;
     final guest = widget.guest;
     if (host != null) {
@@ -170,21 +210,39 @@ class _CoopScreenState extends State<CoopScreen> {
   int _round = 0;
 
   bool get _myTurn =>
-      _game.current == _me && !_game.isOver && !_sent && !_hostGone;
+      !widget.watch &&
+      _game.current == _me &&
+      !_game.isOver &&
+      !_sent &&
+      !_hostGone;
 
-  String? _name(int player) => player == _me ? null : _names[player];
+  String? _name(int player) =>
+      player == _me && !widget.watch ? null : _names[player];
 
-  String _label(int player) => player == _me ? tr.you : _names[player];
+  String _label(int player) =>
+      player == _me && !widget.watch ? tr.you : _names[player];
 
-  void _restart() => setState(() {
-    _round++;
-    _game = _deal();
-    _selected = null;
-    _news.clear();
-    _revealed.clear();
-    _misfire = false;
-    _lastMove = List.filled(_game.players, null);
-  });
+  /// When you only watch, the bots start on their own (after the first
+  /// frame, so the table is up).
+  void _startWatching() {
+    if (!widget.watch) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _runOthers();
+    });
+  }
+
+  void _restart() {
+    setState(() {
+      _round++;
+      _game = _deal();
+      _selected = null;
+      _news.clear();
+      _revealed.clear();
+      _misfire = false;
+      _lastMove = List.filled(_game.players, null);
+    });
+    _startWatching();
+  }
 
   /// Applies [move] for the current player and reports it.
   void _applyMove(CoopMove move) {
@@ -239,13 +297,15 @@ class _CoopScreenState extends State<CoopScreen> {
     await _runOthers();
   }
 
-  bool _running = false;
+  /// The game whose bot turns are being played, if any: a new game may
+  /// start its own loop while the old one winds down.
+  int? _runningRound;
 
   /// Offline or as the host: plays the bots' turns until a person's turn.
   Future<void> _runOthers() async {
-    if (widget.guest != null || _running) return;
-    _running = true;
+    if (widget.guest != null || _runningRound == _round) return;
     final round = _round;
+    _runningRound = round;
     try {
       while (!_game.isOver && _bots.contains(_game.current)) {
         setState(() {});
@@ -256,9 +316,9 @@ class _CoopScreenState extends State<CoopScreen> {
         setState(() => _commit(move));
       }
     } finally {
-      _running = false;
+      if (_runningRound == round) _runningRound = null;
     }
-    if (_game.isOver) await _showEnd();
+    if (_game.isOver && round == _round) await _showEnd();
   }
 
   /// The host: a guest's move, made if it is their turn and legal.
@@ -550,14 +610,16 @@ class _CoopScreenState extends State<CoopScreen> {
         const SizedBox(height: 8),
         _messageBar(),
         const SizedBox(height: 10),
-        _turnLabel(tr.yourHand),
+        _turnLabel(widget.watch ? _names[_me].toUpperCase() : tr.yourHand),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < 5; i++)
-              i < _game.hands[_me].length
+              i < _game.hands[_me].length && widget.watch
+                  ? FaceCardView(card: _game.hands[_me][i], width: cardWidth)
+                  : i < _game.hands[_me].length
                   ? CardView(
                       card: _game.hands[_me][i],
                       width: cardWidth,

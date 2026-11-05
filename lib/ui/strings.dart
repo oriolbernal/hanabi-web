@@ -103,6 +103,12 @@ abstract class Strings {
   String discardedBy(String? name, GameCard c);
   String hintedBy(String? giver, String? receiver, Hint hint);
   String teamScore(int score);
+  String get botsHeader;
+  String get botsClassic;
+  String get botsSelfPlay;
+  String get botsClassicDetail;
+  String get botsSelfPlayDetail;
+  String get watchOnly;
 
   // Online games, on several phones.
   String get offline;
@@ -318,6 +324,20 @@ class _English extends Strings {
 
   @override
   String teamScore(int score) => 'The team scored $score / 25';
+  @override
+  String get botsHeader => 'BOTS';
+  @override
+  String get botsClassic => 'For people';
+  @override
+  String get botsSelfPlay => 'Self-play';
+  @override
+  String get botsClassicDetail => 'Trained to play next to a person.';
+  @override
+  String get botsSelfPlayDetail =>
+      'Learned alone, playing against each other: '
+      'they reach 25 most of the time among themselves.';
+  @override
+  String get watchOnly => 'Only watch (all bots)';
 
   @override
   String get offline => 'Offline';
@@ -634,6 +654,20 @@ class _Catalan extends Strings {
 
   @override
   String teamScore(int score) => "L'equip ha fet $score punts de 25";
+  @override
+  String get botsHeader => 'BOTS';
+  @override
+  String get botsClassic => 'Per a persones';
+  @override
+  String get botsSelfPlay => 'Autojoc';
+  @override
+  String get botsClassicDetail => 'Entrenats per jugar amb una persona.';
+  @override
+  String get botsSelfPlayDetail =>
+      'Han après sols, jugant entre ells: '
+      'entre ells fan 25 la majoria de vegades.';
+  @override
+  String get watchOnly => 'Només mirar (tots bots)';
 
   @override
   String get offline => 'Fora de línia';
@@ -954,6 +988,20 @@ class _Spanish extends Strings {
 
   @override
   String teamScore(int score) => 'El equipo ha hecho $score puntos de 25';
+  @override
+  String get botsHeader => 'BOTS';
+  @override
+  String get botsClassic => 'Para personas';
+  @override
+  String get botsSelfPlay => 'Autojuego';
+  @override
+  String get botsClassicDetail => 'Entrenados para jugar con una persona.';
+  @override
+  String get botsSelfPlayDetail =>
+      'Han aprendido solos, jugando entre ellos: '
+      'entre ellos hacen 25 la mayoría de veces.';
+  @override
+  String get watchOnly => 'Solo mirar (todos bots)';
 
   @override
   String get offline => 'Sin conexión';

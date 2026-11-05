@@ -13,6 +13,7 @@ import 'dart:math';
 import 'package:hanabi/game/coop.dart';
 import 'package:hanabi/sim/coop_bot.dart';
 import 'package:hanabi/sim/coop_net.dart';
+import 'package:hanabi/sim/selfplay_bot.dart';
 import 'package:hanabi/sim/coop_search.dart';
 import 'package:hanabi/sim/expert.dart';
 
@@ -56,6 +57,11 @@ void main(List<String> args) {
           jsonDecode(File(a.substring(6)).readAsStringSync()),
           minPlayChance: minPlay,
         ).decide,
+    for (final a in args)
+      if (a.startsWith('--selfplay='))
+        'SP ${File(a.substring(11)).uri.pathSegments.last.split('.').first}':
+            SelfPlayBot(jsonDecode(File(a.substring(11)).readAsStringSync()))
+                .decide,
   };
   const person = CoopBot(player: ExpertPlayer.human);
   print(

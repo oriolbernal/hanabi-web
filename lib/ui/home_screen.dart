@@ -28,11 +28,18 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _coop = false;
   int _players = 3;
 
+  /// Self-play bots instead of the ones trained for people; watching only.
+  bool _selfPlay = false;
+  bool _watch = false;
+
   Future<void> _play() async {
     if (_coop) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => CoopScreen(players: _players)),
+        MaterialPageRoute(
+          builder: (_) =>
+              CoopScreen(players: _players, selfPlay: _selfPlay, watch: _watch),
+        ),
       );
       return;
     }
@@ -198,6 +205,34 @@ class _HomeScreenState extends State<HomeScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(color: textMuted, fontSize: 13),
           ),
+        ),
+        const SizedBox(height: 8),
+        Text(tr.botsHeader, style: _headerStyle),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(value: false, label: Text(tr.botsClassic)),
+            ButtonSegment(value: true, label: Text(tr.botsSelfPlay)),
+          ],
+          selected: {_selfPlay},
+          onSelectionChanged: (s) => setState(() => _selfPlay = s.first),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 40,
+          child: Text(
+            _selfPlay ? tr.botsSelfPlayDetail : tr.botsClassicDetail,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: textMuted, fontSize: 13),
+          ),
+        ),
+        SwitchListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(tr.watchOnly, style: const TextStyle(color: textMuted)),
+          value: _watch,
+          onChanged: (v) => setState(() => _watch = v),
         ),
       ],
     );

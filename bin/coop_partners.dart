@@ -20,6 +20,7 @@ import 'dart:math';
 import 'package:hanabi/game/coop.dart';
 import 'package:hanabi/sim/coop_bot.dart';
 import 'package:hanabi/sim/coop_net.dart';
+import 'package:hanabi/sim/selfplay_bot.dart';
 import 'package:hanabi/sim/partners.dart';
 import 'package:hanabi/sim/smart_strategies.dart';
 
@@ -114,6 +115,11 @@ void cross(List<String> args) {
           jsonDecode(File(a.substring(6)).readAsStringSync()),
           minPlayChance: minPlay,
         ).decide,
+    for (final a in args)
+      if (a.startsWith('--selfplay='))
+        'SP ${File(a.substring(11)).uri.pathSegments.last.split('.').first}':
+            SelfPlayBot(jsonDecode(File(a.substring(11)).readAsStringSync()))
+                .decide,
   };
   const partners = [...PartnerZoo.trainPartners, ...PartnerZoo.heldOutPartners];
   print('$players players, $games games from seed $seed; partner in seat 0\n');
