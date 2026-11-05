@@ -12,7 +12,9 @@ import 'smart_strategies.dart';
 /// [state] describes the position, [move] one candidate move; the network
 /// reads both, one candidate at a time. Add a [version] when either
 /// changes, so old data and models are not mixed up: c1 summarises the
-/// other hands, c2 adds every card in them and which ones a hint touches.
+/// other hands, c2 adds every card in them and which ones a hint touches,
+/// c3 adds what people read into a hint: the card it points at (its focus)
+/// for the hint each player last received and for each hint move.
 class CoopFeatures {
   CoopFeatures(this.game, {this.version = latest})
     : me = game.current,
@@ -23,16 +25,27 @@ class CoopFeatures {
     pv = PlayerView(view);
   }
 
-  static const versions = ['c1', 'c2'];
-  static const latest = 'c2';
+  static const versions = ['c1', 'c2', 'c3'];
+  static const latest = 'c3';
 
   /// Per card in another player's hand (c2).
   static const _cardSize = 13;
 
   static int stateSize(String version) =>
-      14 + 5 * 8 + 3 * 4 + (version == 'c1' ? 0 : 3 * 5 * _cardSize);
+      14 +
+      5 * 8 +
+      3 * 4 +
+      (version == 'c1' ? 0 : 3 * 5 * _cardSize) +
+      (version == 'c3' ? 5 * 2 + 3 * 5 : 0);
   static int moveSize(String version) =>
-      3 + 5 + 5 + 3 + 1 + 8 + (version == 'c1' ? 0 : 10);
+      3 +
+      5 +
+      5 +
+      3 +
+      1 +
+      8 +
+      (version == 'c1' ? 0 : 10) +
+      (version == 'c3' ? 4 : 0);
 
   final String version;
 
@@ -91,6 +104,28 @@ class CoopFeatures {
         .map((p) => c.number - (f.top(p)?.number ?? 0) - 1)
         .where((g) => g >= 0)
         .fold(4, (a, b) => a < b ? a : b);
+  }
+
+  /// The last hint each player received, if they have not moved since
+  /// (c3): for this player, which cards it touched and which it pointed
+  /// at; for the others, which card it pointed at.
+  List<double> _focus() {
+    final out = <double>[];
+    final mine = game.received[me];
+    for (var i = 0; i < 5; i++) {
+      out
+        ..add(mine != null && mine.focus == i ? 1 : 0)
+        ..add(mine != null && mine.touched.contains(i) ? 1 : 0);
+    }
+    for (var k = 1; k <= 3; k++) {
+      final got = k < game.players
+          ? game.received[(me + k) % game.players]
+          : null;
+      for (var i = 0; i < 5; i++) {
+        out.add(got != null && got.focus == i ? 1 : 0);
+      }
+    }
+    return out;
   }
 
   /// Every card in the other players' hands, in turn order (c2).
@@ -189,6 +224,7 @@ class CoopFeatures {
       ]);
     }
     if (version != 'c1') out.addAll(_cards());
+    if (version == 'c3') out.addAll(_focus());
     assert(out.length == stateSize(version));
     return out;
   }
@@ -198,6 +234,7 @@ class CoopFeatures {
     switch (m) {
       case CoopPlay(:final index) || CoopDiscard(:final index):
         out[m is CoopPlay ? 0 : 1] = 1;
+        if (version == 'c3' && game.received[me]?.focus == index) out[35] = 1;
         out[3 + index] = 1;
         out[8] = pv.playProbability(index);
         out[9] = pv.uselessProbability(index);
@@ -236,6 +273,24 @@ class CoopFeatures {
             if (i == chop) out[33] = 1;
             if (hint is NumberHint ? !c.knownNumber : !c.knownColor) {
               out[34] += 0.2;
+            }
+          }
+          if (version == 'c3') {
+            // What a person would take the hint to mean: play its focus.
+            final touched = [
+              for (var i = 0; i < hand.length; i++)
+                if (switch (hint) {
+                  NumberHint(:final number) => hand[i].number == number,
+                  ColorHint(:final color) => hand[i].color == color,
+                })
+                  i,
+            ];
+            if (touched.isNotEmpty) {
+              final focus = ReceivedHint(me, hint, touched, chop).focus;
+              final c = hand[focus];
+              out[36] = _isPlayable(c) ? 1 : 0;
+              out[37] = focus == chop ? 1 : 0;
+              out[38] = LookaheadStrategy.isCritical(viewOf(to), c) ? 1 : 0;
             }
           }
         }

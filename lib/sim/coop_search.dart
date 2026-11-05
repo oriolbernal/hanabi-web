@@ -5,7 +5,9 @@ import '../game/coop.dart';
 import '../game/game.dart';
 import 'coop_bot.dart';
 import 'expert.dart';
+import 'partners.dart';
 import 'simulated_player.dart';
+import 'smart_strategies.dart';
 
 /// A quick way of playing used to imagine the rest of a game: play a card
 /// the hints say fits, else tell someone about a card that fits now, else
@@ -151,11 +153,36 @@ class SharpCoopPolicy {
 }
 
 /// A quick model of the person, fitted to the co-op move log: plays a card
-/// the hints say fits, or one at least 70% likely to fit with a life to
-/// spare, else gives a hint whenever a token is left (as [QuickCoopPolicy]
-/// would, or any new information), else discards the oldest untouched card.
+/// the hints say fits, or one at least [playThreshold] likely to fit with a
+/// life to spare, else gives a hint whenever a token is left (as
+/// [QuickCoopPolicy] would, or any new information), else discards the
+/// oldest untouched card.
+///
+/// With [readsClues] it also takes the last hint it received as "play this
+/// card" (its focus), as most people do; with [givesClues] its hints point
+/// at a card that fits now, as [ClueReader.playClue] does. Varying these
+/// gives the search a population of partners to imagine, not just one.
 class QuickPersonPolicy {
-  const QuickPersonPolicy();
+  const QuickPersonPolicy({
+    this.playThreshold = 0.7,
+    this.readsClues = false,
+    this.givesClues = false,
+  });
+
+  final double playThreshold;
+  final bool readsClues;
+  final bool givesClues;
+
+  /// The partners the search imagines in the person's seat, one per
+  /// imagined game in turn.
+  static const population = [
+    QuickPersonPolicy(),
+    QuickPersonPolicy(playThreshold: 0.5),
+    QuickPersonPolicy(playThreshold: 0.95),
+    QuickPersonPolicy(readsClues: true),
+    QuickPersonPolicy(readsClues: true, givesClues: true),
+    QuickPersonPolicy(readsClues: true, givesClues: true, playThreshold: 0.5),
+  ];
 
   CoopMove decide(CoopGame game) {
     final me = game.current;
@@ -170,10 +197,23 @@ class QuickPersonPolicy {
         bestP = p;
       }
     }
-    if (best >= 0 && (bestP >= 0.999 || (bestP >= 0.7 && game.errors > 1))) {
+    if (best >= 0 && bestP >= 0.999) return CoopPlay(best);
+    final got = game.received[me];
+    if (readsClues && got != null && got.hint != NumberHint(5)) {
+      final f = got.focus;
+      if (f < view.hand.length && !pv.surelyUseless(f)) {
+        final p = pv.playProbability(f);
+        if (p > 0 && (game.errors > 1 || p >= 0.5)) return CoopPlay(f);
+      }
+    }
+    if (best >= 0 && bestP >= playThreshold && game.errors > 1) {
       return CoopPlay(best);
     }
     if (game.hints > 0) {
+      if (givesClues) {
+        final clue = ClueReader.playClue(game);
+        if (clue != null) return clue;
+      }
       final quick = const QuickCoopPolicy().decide(game);
       if (quick is CoopHint) return quick;
       for (var k = 1; k < game.players; k++) {
@@ -199,14 +239,21 @@ class CoopSearch {
     this.base = const CoopBot(),
     CoopMove Function(CoopGame)? rollout,
     this.person,
+    this.personModels = const [QuickPersonPolicy()],
     this.minPlayChance = 0.4,
     Random? random,
   }) : rollout = rollout ?? const QuickCoopPolicy().decide,
        _random = random ?? Random();
 
-  /// The person's seat, played in the imagined games by [QuickPersonPolicy];
+  /// The person's seat, played in the imagined games by [personModels];
   /// null when every seat is a bot.
   final int? person;
+
+  /// How the person may play: each imagined game takes the next one in
+  /// turn, the same for every candidate move so they compare fairly. With
+  /// several, the moves that work with all of them win, not those tuned to
+  /// a single way of playing.
+  final List<QuickPersonPolicy> personModels;
 
   /// A card is only a candidate to play if it fits for sure or, with a
   /// life to spare, at least this likely; with the deck empty any card may
@@ -241,8 +288,9 @@ class CoopSearch {
     for (var r = 0; r < rounds; r++) {
       final world = CoopGame.imagined(game, game.current, _random);
       final seed = _random.nextInt(1 << 30);
+      final model = personModels[r % personModels.length];
       for (var m = 0; m < options.length; m++) {
-        totals[m] += _playOut(world, options[m], seed);
+        totals[m] += _playOut(world, options[m], seed, model);
       }
     }
     return [
@@ -262,7 +310,12 @@ class CoopSearch {
     return move;
   }
 
-  double _playOut(CoopGame world, CoopMove move, int seed) {
+  double _playOut(
+    CoopGame world,
+    CoopMove move,
+    int seed,
+    QuickPersonPolicy model,
+  ) {
     final g = CoopGame.copy(world);
     final card = switch (move) {
       CoopPlay(:final index) => g.hands[g.current][index],
@@ -282,9 +335,7 @@ class CoopSearch {
     final random = Random(seed);
     var turns = 0;
     while (!g.isOver && turns++ < 200) {
-      final m = g.current == person
-          ? const QuickPersonPolicy().decide(g)
-          : rollout(g);
+      final m = g.current == person ? model.decide(g) : rollout(g);
       if (m case CoopPlay(:final index) when g.needsTarget(index)) {
         final c = g.hands[g.current][index];
         final fits = [
@@ -330,8 +381,7 @@ class CoopSearch {
     if (game.hints < maxHints) {
       final chop = view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
       if (chop >= 0) add(CoopDiscard(chop));
-      final safest = ExpertPlayer.tuned.decideWithReason(view..hints = 0).move;
-      if (safest case DiscardMove(:final index)) add(CoopDiscard(index));
+      add(CoopDiscard(safestDiscard(view, pv)));
     }
     if (game.hints > 0) {
       for (var k = 1; k < game.players; k++) {
@@ -341,22 +391,68 @@ class CoopSearch {
         }
       }
     }
+    // Never throw away a card that surely matters: one that surely fits,
+    // or one that is surely the last copy of a card still needed (a known
+    // 5, say). People take such a discard as nonsense, and rightly.
+    bool wasteful(CoopMove m) =>
+        m is CoopDiscard &&
+        (pv.surelyPlayable(m.index) ||
+            criticalChance(view, pv, m.index) >= 0.99);
     final safe = [
       for (final m in result.values)
-        if (!reckless(m)) m,
+        if (!reckless(m) && !wasteful(m)) m,
     ];
     if (safe.isEmpty) {
       // Only reckless plays left (all tokens in hand, nothing new to tell):
       // a discard wastes nothing but the token it cannot win back.
-      final chop = view.hand.indexWhere((c) => !c.knownNumber && !c.knownColor);
-      final safest = ExpertPlayer.tuned.decideWithReason(view..hints = 0).move;
-      safe.add(
-        safest is DiscardMove
-            ? CoopDiscard(safest.index)
-            : CoopDiscard(max(chop, 0)),
-      );
+      safe.add(CoopDiscard(safestDiscard(view, pv)));
     }
     return safe;
+  }
+
+  /// How likely the card at [index] is the last copy of a card still
+  /// needed, as its holder can tell.
+  static double criticalChance(Game view, PlayerView pv, int index) {
+    final w = pv.weights(index);
+    var total = 0, critical = 0;
+    for (final MapEntry(key: (number, color), value: n) in w.entries) {
+      total += n;
+      if (LookaheadStrategy.isCritical(view, GameCard(number, color))) {
+        critical += n;
+      }
+    }
+    return total == 0 ? 0 : critical / total;
+  }
+
+  /// The card whose loss costs least: one surely useless if there is one,
+  /// else the lowest expected cost in points, a hinted card costing
+  /// [hintedPenalty] more (the hint was spent on it for a reason), and a
+  /// card that surely fits never.
+  static int safestDiscard(
+    Game view,
+    PlayerView pv, {
+    double hintedPenalty = 0.3,
+  }) {
+    var best = 0;
+    var bestCost = double.infinity;
+    for (var i = 0; i < view.hand.length; i++) {
+      final c = view.hand[i];
+      final double cost;
+      if (pv.surelyUseless(i)) {
+        cost = -1;
+      } else if (pv.surelyPlayable(i) || criticalChance(view, pv, i) >= 0.99) {
+        cost = 100;
+      } else {
+        cost =
+            pv.expectedDiscardRisk(i) +
+            (c.knownNumber || c.knownColor ? hintedPenalty : 0);
+      }
+      if (cost < bestCost) {
+        best = i;
+        bestCost = cost;
+      }
+    }
+    return best;
   }
 
   static String _key(CoopMove m) => switch (m) {

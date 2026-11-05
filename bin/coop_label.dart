@@ -9,6 +9,9 @@
 //       [--players=2,3,4] [--person]
 //
 // --person puts the model of the person in seat 0 in every game;
+// --zoo puts a partner from the training population (lib/sim/partners.dart)
+// in seat 0 in every game, a different one each game, and makes the search
+// imagine the whole quick population (QuickPersonPolicy.population) there;
 // --rollout=person plays every seat of the imagined games like the person
 // (a stronger search: 24.2 instead of 23.4 with four players).
 //
@@ -27,6 +30,7 @@ import 'package:hanabi/sim/coop_features.dart';
 import 'package:hanabi/sim/coop_net.dart';
 import 'package:hanabi/sim/coop_search.dart';
 import 'package:hanabi/sim/expert.dart';
+import 'package:hanabi/sim/partners.dart';
 
 String _f(double x) => x == 0 ? '0' : x.toStringAsFixed(4);
 
@@ -49,10 +53,14 @@ void main(List<String> args) {
   final random = Random(from);
   // In games with the person, the imagined games play their seat the way
   // the person does (QuickPersonPolicy).
+  final zoo = args.contains('--zoo');
   CoopSearch searchFor(bool withPerson) => CoopSearch(
     rounds: rounds,
     random: random,
     person: withPerson ? 0 : null,
+    personModels: zoo
+        ? QuickPersonPolicy.population
+        : const [QuickPersonPolicy()],
     rollout: args.contains('--rollout=person')
         ? const QuickPersonPolicy().decide
         : args.contains('--rollout-net') && net != null
@@ -65,11 +73,17 @@ void main(List<String> args) {
   for (var seed = from; seed < to; seed++) {
     final players = playerCounts[seed % playerCounts.length];
     final game = CoopGame(players: players, random: Random(seed));
-    final withPerson = seed.isEven || args.contains('--person');
+    final withPerson = seed.isEven || args.contains('--person') || zoo;
     final search = searchFor(withPerson);
+    final partner = zoo
+        ? PartnerZoo.byName(
+            PartnerZoo.trainPartners[seed % PartnerZoo.trainPartners.length],
+            random: Random(seed),
+          )
+        : person.decide;
     while (!game.isOver) {
       if (game.current == 0 && withPerson) {
-        game.apply(person.decide(game));
+        game.apply(partner(game));
         continue;
       }
       final scored = search.evaluate(game);

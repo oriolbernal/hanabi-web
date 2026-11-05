@@ -51,6 +51,23 @@ sealed class CoopMove {
   };
 }
 
+/// The last hint a player received since their own last turn: who gave
+/// it, which positions it touched and which position was the chop (the
+/// oldest card no hint had touched) just before it. People read a hint by
+/// its focus ([focus]): the chop if the hint touched it, else the newest
+/// card it touched.
+class ReceivedHint {
+  ReceivedHint(this.giver, this.hint, this.touched, this.chop);
+
+  final int giver;
+  final Hint hint;
+  final List<int> touched;
+  final int chop;
+
+  int get focus =>
+      touched.contains(chop) ? chop : touched.reduce((a, b) => a > b ? a : b);
+}
+
 /// A deck as text, two characters a card (`1R`, `3*`), and back.
 String deckText(List<GameCard> deck) => deck.map((c) => '$c').join();
 
@@ -102,6 +119,7 @@ class CoopGame {
       _deck = deck ?? buildDeck(random),
       fireworks = Fireworks() {
     for (var p = 0; p < players; p++) {
+      received.add(null);
       hands.add([]);
       for (var i = 0; i < handSize; i++) {
         _draw(p);
@@ -117,6 +135,7 @@ class CoopGame {
       hints = other.hints,
       errors = other.errors,
       current = other.current {
+    received.addAll(other.received);
     for (final hand in other.hands) {
       hands.add([for (final c in hand) c.copy()]);
     }
@@ -183,6 +202,9 @@ class CoopGame {
   final List<List<GameCard>> hands = [];
   final List<GameCard> discarded = [];
   final Fireworks fireworks;
+
+  /// Per player, the last hint received since their own last turn.
+  final List<ReceivedHint?> received = [];
   int hints = maxHints;
   int errors = allowedErrors;
 
@@ -265,6 +287,7 @@ class CoopGame {
     assert(to != current && hints > 0);
     hints--;
     final touched = <GameCard>[];
+    final chop = hands[to].indexWhere((c) => !c.knownNumber && !c.knownColor);
     for (final card in hands[to]) {
       switch (hint) {
         case NumberHint(:final number) when card.number == number:
@@ -279,6 +302,10 @@ class CoopGame {
           card.ruleOutColor(color);
       }
     }
+    received[to] = ReceivedHint(current, hint, [
+      for (var i = 0; i < hands[to].length; i++)
+        if (touched.contains(hands[to][i])) i,
+    ], chop);
     _endTurn();
     return touched;
   }
@@ -325,6 +352,7 @@ class CoopGame {
   }
 
   void _endTurn() {
+    if (hands.isNotEmpty) received[current] = null;
     if (isOver) return;
     do {
       current = (current + 1) % players;
