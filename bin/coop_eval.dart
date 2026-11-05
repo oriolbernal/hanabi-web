@@ -63,7 +63,7 @@ void main(List<String> args) {
     '${allBots ? 'all bots' : 'seat 0 = person model'}\n',
   );
   print(
-    'bot            mean   gain  ±95%   hints to seat 0   ms/move  bot misfires',
+    'bot            mean   gain  ±95%   hints to seat 0   ms/move  bot misfires   25s',
   );
   List<int>? base;
   for (final MapEntry(key: name, value: bot) in bots.entries) {
@@ -99,7 +99,8 @@ void main(List<String> args) {
       '${(1.96 * sd / sqrt(games)).toStringAsFixed(2)}   '
       '${(toYou / games).toStringAsFixed(1).padLeft(10)}   '
       '${(watch.elapsedMilliseconds / max(1, moves)).toStringAsFixed(1).padLeft(10)}'
-      '${(misfires / games).toStringAsFixed(2).padLeft(13)}',
+      '${(misfires / games).toStringAsFixed(2).padLeft(13)}'
+      '${(100 * scores.where((s) => s == 25).length / games).toStringAsFixed(0).padLeft(5)}%',
     );
   }
 }

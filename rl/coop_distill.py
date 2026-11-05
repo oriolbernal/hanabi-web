@@ -107,7 +107,8 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-5)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--features", default="c2")
+    p.add_argument("--features", default="c3")
+    p.add_argument("--moves", default="shortlist", help="'all' if every legal move was scored")
     args = p.parse_args()
     torch.manual_seed(args.seed)
 
@@ -141,6 +142,7 @@ def main() -> None:
         {
             "agent": "coop",
             "features": args.features,
+            "moves": args.moves,
             "layers": [
                 {"w": rounded(m.weight), "b": rounded(m.bias)}
                 for m in net.net

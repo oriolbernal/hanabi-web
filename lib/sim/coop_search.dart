@@ -7,7 +7,6 @@ import 'coop_bot.dart';
 import 'expert.dart';
 import 'partners.dart';
 import 'simulated_player.dart';
-import 'smart_strategies.dart';
 
 /// A quick way of playing used to imagine the rest of a game: play a card
 /// the hints say fits, else tell someone about a card that fits now, else
@@ -241,6 +240,7 @@ class CoopSearch {
     this.person,
     this.personModels = const [QuickPersonPolicy()],
     this.minPlayChance = 0.4,
+    this.allMoves = false,
     Random? random,
   }) : rollout = rollout ?? const QuickCoopPolicy().decide,
        _random = random ?? Random();
@@ -260,6 +260,11 @@ class CoopSearch {
   /// be tried. Blind plays look reckless to a person even when they pay
   /// off on average.
   final double minPlayChance;
+
+  /// Weighs every legal move, with no hand-made shortlist and no filter:
+  /// what is worth doing (and when a 5 may go) is left to the imagined
+  /// games, and to the network that learns from them.
+  final bool allMoves;
 
   final int rounds;
   final CoopBot base;
@@ -357,6 +362,7 @@ class CoopSearch {
 
   /// The moves worth comparing, without repeats.
   List<CoopMove> candidates(CoopGame game) {
+    if (allMoves) return legalMoves(game);
     final me = game.current;
     final view = game.viewFor(me);
     final pv = PlayerView(view);
@@ -391,16 +397,9 @@ class CoopSearch {
         }
       }
     }
-    // Never throw away a card that surely matters: one that surely fits,
-    // or one that is surely the last copy of a card still needed (a known
-    // 5, say). People take such a discard as nonsense, and rightly.
-    bool wasteful(CoopMove m) =>
-        m is CoopDiscard &&
-        (pv.surelyPlayable(m.index) ||
-            criticalChance(view, pv, m.index) >= 0.99);
     final safe = [
       for (final m in result.values)
-        if (!reckless(m) && !wasteful(m)) m,
+        if (!reckless(m)) m,
     ];
     if (safe.isEmpty) {
       // Only reckless plays left (all tokens in hand, nothing new to tell):
@@ -410,18 +409,19 @@ class CoopSearch {
     return safe;
   }
 
-  /// How likely the card at [index] is the last copy of a card still
-  /// needed, as its holder can tell.
-  static double criticalChance(Game view, PlayerView pv, int index) {
-    final w = pv.weights(index);
-    var total = 0, critical = 0;
-    for (final MapEntry(key: (number, color), value: n) in w.entries) {
-      total += n;
-      if (LookaheadStrategy.isCritical(view, GameCard(number, color))) {
-        critical += n;
-      }
-    }
-    return total == 0 ? 0 : critical / total;
+  /// Every move the current player may make: play or discard any card, or
+  /// any hint that tells another player something new.
+  static List<CoopMove> legalMoves(CoopGame game) {
+    final me = game.current;
+    final hand = game.hands[me].length;
+    return [
+      for (var i = 0; i < hand; i++) CoopPlay(i),
+      for (var i = 0; i < hand; i++) CoopDiscard(i),
+      if (game.hints > 0)
+        for (var k = 1; k < game.players; k++)
+          for (final h in game.hintsFor((me + k) % game.players))
+            CoopHint((me + k) % game.players, h),
+    ];
   }
 
   /// The card whose loss costs least: one surely useless if there is one,
@@ -440,7 +440,7 @@ class CoopSearch {
       final double cost;
       if (pv.surelyUseless(i)) {
         cost = -1;
-      } else if (pv.surelyPlayable(i) || criticalChance(view, pv, i) >= 0.99) {
+      } else if (pv.surelyPlayable(i)) {
         cost = 100;
       } else {
         cost =

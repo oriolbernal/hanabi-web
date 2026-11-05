@@ -9,8 +9,9 @@
 //       [--players=2,3,4] [--person]
 //
 // --person puts the model of the person in seat 0 in every game;
+// --all weighs every legal move instead of the shortlist of sensible ones;
 // --zoo puts a partner from the training population (lib/sim/partners.dart)
-// in seat 0 in every game, a different one each game, and makes the search
+// in seat 0 in even-seeded games, a different one each game, and makes the search
 // imagine the whole quick population (QuickPersonPolicy.population) there;
 // --rollout=person plays every seat of the imagined games like the person
 // (a stronger search: 24.2 instead of 23.4 with four players).
@@ -58,6 +59,7 @@ void main(List<String> args) {
     rounds: rounds,
     random: random,
     person: withPerson ? 0 : null,
+    allMoves: args.contains('--all'),
     personModels: zoo
         ? QuickPersonPolicy.population
         : const [QuickPersonPolicy()],
@@ -73,7 +75,8 @@ void main(List<String> args) {
   for (var seed = from; seed < to; seed++) {
     final players = playerCounts[seed % playerCounts.length];
     final game = CoopGame(players: players, random: Random(seed));
-    final withPerson = seed.isEven || args.contains('--person') || zoo;
+    // With --zoo, odd seeds are all bots: the bots also learn each other.
+    final withPerson = seed.isEven || args.contains('--person');
     final search = searchFor(withPerson);
     final partner = zoo
         ? PartnerZoo.byName(

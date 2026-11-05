@@ -9,7 +9,11 @@ import '../game/coop.dart';
 class CoopNet {
   CoopNet(Map<String, dynamic> weights, {double minPlayChance = 0.4})
     : _net = Mlp(weights),
-      _search = CoopSearch(rounds: 0, minPlayChance: minPlayChance),
+      _search = CoopSearch(
+        rounds: 0,
+        minPlayChance: minPlayChance,
+        allMoves: weights['moves'] == 'all',
+      ),
       _version = weights['features'] as String {
     if (!CoopFeatures.versions.contains(_version)) {
       throw ArgumentError('model for unknown features $_version');
