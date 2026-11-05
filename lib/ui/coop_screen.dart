@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -77,6 +78,8 @@ class _CoopScreenState extends State<CoopScreen> {
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   /// A fresh game; in dev mode the deck order opens its record in [MoveLog].
+  static final _random = Random();
+
   CoopGame _deal() {
     _moves = 0;
     _sent = false;
@@ -86,19 +89,30 @@ class _CoopScreenState extends State<CoopScreen> {
       _me = guest.seat ?? 0;
       _names = start.table.names;
       _bots = {...start.table.bots};
-      return CoopGame(players: start.table.players, deck: List.of(start.deck));
+      return CoopGame(
+        players: start.table.players,
+        deck: List.of(start.deck),
+        first: start.first,
+      );
     }
     final deck = buildDeck();
     final host = widget.host;
     if (host != null) {
-      final seating = host.start(deck);
+      final first = _random.nextInt(host.players);
+      final seating = host.start(deck, first: first);
       _me = 0;
       _names = seating.names;
       _bots = {...seating.bots};
-      return CoopGame(players: seating.players, deck: List.of(deck));
+      return CoopGame(
+        players: seating.players,
+        deck: List.of(deck),
+        first: first,
+      );
     }
+    // Whoever plays first is drawn at random, as at a real table.
+    final first = _random.nextInt(widget.players);
     if (Settings.devMode.value && !widget.watch) {
-      MoveLog.startGame(deck, mode: 'coop${widget.players}');
+      MoveLog.startGame(deck, mode: 'coop${widget.players}', first: first);
     }
     _me = 0;
     _names = [
@@ -106,7 +120,7 @@ class _CoopScreenState extends State<CoopScreen> {
       for (var s = 1; s < widget.players; s++) botName(s),
     ];
     _bots = {for (var s = widget.watch ? 0 : 1; s < widget.players; s++) s};
-    return CoopGame(players: widget.players, deck: List.of(deck));
+    return CoopGame(players: widget.players, deck: List.of(deck), first: first);
   }
 
   /// The network trained on the search (rl/models/D10: 512x512, features
@@ -222,10 +236,10 @@ class _CoopScreenState extends State<CoopScreen> {
   String _label(int player) =>
       player == _me && !widget.watch ? tr.you : _names[player];
 
-  /// When you only watch, the bots start on their own (after the first
-  /// frame, so the table is up).
+  /// When a bot plays first (or you only watch), the bots start on their
+  /// own, after the first frame so the table is up.
   void _startWatching() {
-    if (!widget.watch) return;
+    if (!_bots.contains(_game.current)) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _runOthers();
     });

@@ -34,6 +34,7 @@ void main(List<String> args) {
       final game = CoopGame(
         players: int.parse(mode.substring(4)),
         deck: parseDeck(e['deck'] as String),
+        first: e['first'] as int? ?? 0,
       );
       for (final text in moves) {
         if (game.isOver) break;

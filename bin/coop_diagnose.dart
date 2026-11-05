@@ -48,6 +48,7 @@ void main(List<String> args) {
       final game = CoopGame(
         players: players,
         deck: parseDeck(e['deck'] as String),
+        first: e['first'] as int? ?? 0,
       );
       final moves = [
         for (final m in (e['moves'] as List).cast<String>()) CoopMove.parse(m),

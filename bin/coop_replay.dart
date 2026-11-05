@@ -50,7 +50,11 @@ void main(List<String> args) {
           CardColor.values.firstWhere((c) => c.symbol == text[i + 1]),
         ),
     ];
-    final game = CoopGame(players: players, deck: deck);
+    final game = CoopGame(
+      players: players,
+      deck: deck,
+      first: e['first'] as int? ?? 0,
+    );
     print('\n=== ${e['at']}  $players players');
     var toYou = 0;
     for (final m in (e['moves'] as List).cast<String>()) {

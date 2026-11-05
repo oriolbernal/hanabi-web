@@ -48,6 +48,7 @@ sealed class HostMessage {
       'start' => StartGame(
         Seating.fromJson(json),
         parseDeck(json['deck'] as String),
+        first: json['first'] as int? ?? 0,
       ),
       'move' => MoveMade(json['n'] as int, CoopMove.parse(json['m'] as String)),
       'bot' => BotTakesOver(json['seat'] as int),
@@ -70,9 +71,12 @@ class LobbyUpdate extends HostMessage {
 
 /// A new game: who sits where and the deck, in the order it is dealt.
 class StartGame extends HostMessage {
-  StartGame(this.table, this.deck);
+  StartGame(this.table, this.deck, {this.first = 0});
   final Seating table;
   final List<GameCard> deck;
+
+  /// The seat that plays first.
+  final int first;
 }
 
 /// Move number [n] of the game (0 is the first), whoever made it.
@@ -218,11 +222,17 @@ class HostSession {
     _broadcast({'t': 'lobby', ...table.toJson()});
   }
 
-  /// Starts a game with [deck]; returns who sits where.
-  Seating start(List<GameCard> deck) {
+  /// Starts a game with [deck], [first] playing first; returns who sits
+  /// where.
+  Seating start(List<GameCard> deck, {int first = 0}) {
     _playing = true;
     final t = table;
-    _broadcast({'t': 'start', ...t.toJson(), 'deck': deckText(deck)});
+    _broadcast({
+      't': 'start',
+      ...t.toJson(),
+      'deck': deckText(deck),
+      'first': first,
+    });
     return t;
   }
 

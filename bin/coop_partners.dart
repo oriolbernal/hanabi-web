@@ -62,6 +62,7 @@ void fit(List<String> paths) {
       final game = CoopGame(
         players: int.parse(mode.substring(4)),
         deck: parseDeck(e['deck'] as String),
+        first: e['first'] as int? ?? 0,
       );
       for (final text in (e['moves'] as List).cast<String>()) {
         if (game.isOver) break;

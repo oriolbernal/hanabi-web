@@ -133,10 +133,16 @@ class CoopHint extends CoopMove {
 /// goes on, as in the solitaire, until every hand is empty; a player with
 /// no cards left is skipped.
 class CoopGame {
-  CoopGame({required this.players, Random? random, List<GameCard>? deck})
-    : assert(players >= 2 && players <= maxPlayers),
-      _deck = deck ?? buildDeck(random),
-      fireworks = Fireworks() {
+  CoopGame({
+    required this.players,
+    Random? random,
+    List<GameCard>? deck,
+    int first = 0,
+  }) : assert(players >= 2 && players <= maxPlayers),
+       assert(first >= 0 && first < players),
+       _deck = deck ?? buildDeck(random),
+       current = first,
+       fireworks = Fireworks() {
     for (var p = 0; p < players; p++) {
       received.add(null);
       lastMoves.add(null);
@@ -232,8 +238,9 @@ class CoopGame {
   int hints = maxHints;
   int errors = allowedErrors;
 
-  /// Whose turn it is; player 0 is the person.
-  int current = 0;
+  /// Whose turn it is; player 0 is the person. The cards are dealt from
+  /// player 0 on, whoever plays first.
+  int current;
 
   /// Cards per hand: five, whatever the number of players.
   int get handSize => 5;

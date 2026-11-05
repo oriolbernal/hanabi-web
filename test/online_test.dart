@@ -157,6 +157,24 @@ void main() {
     expect(host.table.bots, {1, 2});
   });
 
+  test('the host tells who plays first', () async {
+    final host = HostSession('Oriol')..players = 3;
+    final (hostEnd, guestEnd) = LocalLink.pair();
+    host.seat(1, hostEnd);
+    final guest = GuestSession(guestEnd, 'Anna');
+    await pumpEventQueue();
+    host.start(buildDeck(Random(2)), first: 2);
+    await pumpEventQueue();
+    expect(guest.game!.first, 2);
+    final game = CoopGame(
+      players: 3,
+      deck: List.of(guest.game!.deck),
+      first: guest.game!.first,
+    );
+    expect(game.current, 2);
+    expect(game.hands.every((h) => h.length == 5), isTrue);
+  });
+
   test('garbled messages change nothing', () async {
     final host = HostSession('Oriol');
     final (hostEnd, guestEnd) = LocalLink.pair();

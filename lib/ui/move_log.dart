@@ -18,7 +18,8 @@ import '../sim/simulated_player.dart';
 ///
 /// A cooperative game (mode `coop2` to `coop4`) deals the deck hand by hand,
 /// player 0 (the person) first, and records every player's move in turn
-/// order; a hint names its receiver, `h2:5` or `h1:R`.
+/// order from the player who starts (`first`, 0 when absent); a hint names
+/// its receiver, `h2:5` or `h1:R`.
 class MoveLog {
   MoveLog._();
 
@@ -57,10 +58,12 @@ class MoveLog {
   static Future<void> startGame(
     List<GameCard> deck, {
     required String mode,
+    int first = 0,
   }) async {
     final game = <String, dynamic>{
       'at': DateTime.now().toIso8601String(),
       'mode': mode,
+      if (first != 0) 'first': first,
       'deck': deck.map((c) => c.toString()).join(),
       'moves': <String>[],
       'advice': <String>[],
